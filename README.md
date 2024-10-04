@@ -2,7 +2,7 @@
 
 ## Cite
 
-To cite the contents of this repository, please cite both the paper [Microgrid Planner: An Open-Source Software Platform](https://doi.org/10.1287/ijoc.2023.0336) and its corresponding [GitHub repository](https://doi.org/10.1287/ijoc.2023.0336.cd).
+To cite the contents of this repository, please cite both the paper [Microgrid Planner: An Open-Source Software Platform](https://doi.org/10.1287/ijoc.2023.0336) and its corresponding [GitHub repository](https://github.com/INFORMSJoC/2023.0336).
 
 ## Description
 
