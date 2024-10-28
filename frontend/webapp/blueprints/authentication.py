@@ -204,10 +204,10 @@ def login():
 				if settings['account_activation']['value'] == _ACCOUNT_ACTIVATION_AUTOMATED and account['activation_code'] != _ACCOUNT_STATUS_ACTIVATED:
 					return 'Please activate your account to login!'
 				if settings['account_activation']['value'] == _ACCOUNT_ACTIVATION_MANUAL:
-					if account['activation_code'] == _ACCOUNT_STATUS_NOT_CONFIRMED:
-						return 'Please activate your account to login!'
 					if account['activation_code'] == _ACCOUNT_STATUS_CONFIRMED:
 						return 'Your account is pending approval. You may email the system admin at {0} for a status update'.format(app.config["MAIL_REPLY_TO"])
+					if account['activation_code'] != _ACCOUNT_STATUS_ACTIVATED:
+						return 'Please activate your account to login!'
 			# CSRF protection, form token should match the session token
 			if settings['csrf_protection']['value'] == 'true' and str(token) != str(session['token']):
 				return 'Invalid token!'
