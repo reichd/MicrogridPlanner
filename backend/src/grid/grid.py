@@ -475,11 +475,14 @@ class Grid(object):
         wet_stacking_flag = False
         for type in self._generators:
             if powers[type] > 0.0:
-                energy, fuel_consumed, wet_stacking_flag = self._generate_energy(
+                energy, fuel_consumed_temp, wet_stacking_flag_temp = self._generate_energy(
                     type=type,
                     power=powers[type],
                     duration=duration,
                 )
+                if type == defaults.DIESEL_GENERATOR:
+                    fuel_consumed = fuel_consumed_temp
+                    wet_stacking_flag = wet_stacking_flag_temp
             elif powers[type]<0.0 and type == defaults.BATTERY:
                 unstored_energy = self.store_battery_energy(
                     power=-powers[defaults.BATTERY],
