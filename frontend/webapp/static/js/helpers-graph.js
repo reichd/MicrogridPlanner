@@ -45,7 +45,7 @@ const apexLabelStyles = {
 
 const dateFormatter = (timestamp) => {
   const date = new Date(timestamp);
-  return getDateString(date) + " " + getTimeString({date, withSeconds: false});
+  return getDateString(date) + " " + getTimeString({date, withSeconds: true});
 };
 
 // Returns labels rounded to nearest 1-
@@ -86,7 +86,7 @@ const buildGraphPowerloadApex = (options) => {
       zoom: { enabled: true },
       toolbar: {
         export: {
-          csv: { dateFormatter, filename },
+          csv: { categoryFormatter:dateFormatter, filename },
           png: { filename },
           svg: { filename }
         }
@@ -277,7 +277,7 @@ function buildApexChart(options) {
       zoom: { enabled: true },
       toolbar: {
         export: {
-          csv: { dateFormatter, filename },
+          csv: { categoryFormatter:dateFormatter, filename },
           png: { filename },
           svg: { filename }
         }
