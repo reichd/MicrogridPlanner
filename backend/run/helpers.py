@@ -8,17 +8,17 @@ import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
-from src.grid import Grid
-from src.models import CoreSimulation, Weather, Sizing, Simulate
+from src.grid import Grid, Disturbance
+from src.models import CoreSimulation, Weather, Sizing, Simulate, Resilience
 import src.data.mysql.users as database_users
 import src.data.mysql.grids as database_grids
-from src.data.mysql import simulate, sizing
+from src.data.mysql import simulate, sizing, resilience
 
 """
 Helpers for all run scripts
 """
 
-DATABASES = {"simulate": simulate, "sizing": sizing}
+DATABASES = {"simulate": simulate, "sizing": sizing, "resilience": resilience}
 
 _CONFIG_INI_GLOBAL = configparser.ConfigParser()
 _CONFIG_INI_GLOBAL.read(os.path.join(os.path.dirname(os.getcwd()),"config.ini"))
@@ -28,10 +28,20 @@ _ADMIN_EMAIL = _CONFIG_INI_GLOBAL.get("MAIL","MAIL_REPLY_TO",fallback="")
 RNG_SEED = "random_number_generator_seed"
 LOAD_ID = "load_id"
 GRID_ID = "grid_id"
+METHOD = "method"
+DISTURBANCE_STARTDATETIME = "disturbance_startdatetime"
+DISTURBANCE_ID = "disturbance_id"
 LOCATION_ID = "location_id"
 STARTDATETIME = "startdatetime"
 ENDDATETIME = "enddatetime"
+EXTEND_TIMEFRAME = "extend_timeframe_proportion"
+REPAIR_ID = "repair_id"
 ENERGY_MANAGEMENT_SYSTEM_ID = "energy_management_system_id"
+NUM_RUNS = "num_runs"
+NUM_SHIFT_HOURS = "disturbance_shift_hours"
+NUM_LEVELS = "num_levels"
+ALGORITHM = "algorithm"
+DEBUG = "debug"
 WEATHER_SAMPLE_METHOD = "weather_sample_method"
 PARAMS_JSON_FILENAME = "params.json"
 PARAMS_PICKLE_FILENAME = "params.pkl"
@@ -52,6 +62,23 @@ def initialize_simulation_object(run_param_dict):
     except Exception as error:
         raise Exception("Error in initialize_simulation_object retrieving weather data:\n"+str(error))
     grid.initialize_components(components)
+    if DISTURBANCE_ID in run_param_dict and run_param_dict[DISTURBANCE_ID] is not None:
+        try:
+            disturbance_probs = DATABASES["resilience"].disturbance_repair_get(run_param_dict[DISTURBANCE_ID], "disturbance")
+        except Exception as error:
+            raise Exception("initialize_simulation_object failed to retrieve disturbance probabilities:\n"+str(error))
+        try:
+            repair_times = DATABASES["resilience"].disturbance_repair_get(run_param_dict[REPAIR_ID], "repair")
+        except Exception as error:
+            raise Exception("initialize_simulation_object failed to retrieve repair times:\n"+str(error))
+        disturbance = Disturbance(
+            start_datetime=run_param_dict[DISTURBANCE_STARTDATETIME],
+            probabilities=disturbance_probs,
+            repair_times=repair_times,
+            method=run_param_dict[METHOD],
+        )
+    else:
+        disturbance = None
     sim = CoreSimulation(
         grid=grid,
         energy_management_system_id=run_param_dict[ENERGY_MANAGEMENT_SYSTEM_ID],
@@ -59,7 +86,9 @@ def initialize_simulation_object(run_param_dict):
         start_datetime=run_param_dict[STARTDATETIME] if STARTDATETIME in run_param_dict else None,
         end_datetime=run_param_dict[ENDDATETIME] if ENDDATETIME in run_param_dict else None,
         weather=weather,
-        extend_proportion=0.0,
+        extend_proportion= run_param_dict[EXTEND_TIMEFRAME] 
+                            if EXTEND_TIMEFRAME in run_param_dict and run_param_dict[EXTEND_TIMEFRAME] is not None else 0,
+        disturbance=disturbance,
     )
     return sim
 
@@ -140,16 +169,16 @@ def email_compute_failure(table_name, id, error, admin_only=False):
     """Email the user that the computation has failed.
     Email the admin that the computation has failed with details."""
     if id == None: return
+    recipient_email = database_users.get_result_email(table_name, id)
     try:
         email(
             recipient_email=_ADMIN_EMAIL,
-            subject="{0} failed: id = {1}".format(table_name, id),
+            subject="{0} failed: id = {1}, user = {2}".format(table_name, id, recipient_email),
             message_body=str(error)
         )
     except Exception:
         raise RuntimeError("failure email failed to send to admin")
     if admin_only: return
-    recipient_email = None if id is None else database_users.get_result_email(table_name, id)
     if recipient_email is None: return
     time.sleep(5)
     try:
@@ -181,8 +210,11 @@ def run_analysis(table_name, id, params, results_relative_url, send_email=True):
             simulate = Simulate(core_sim)
             simulate.run(results_dir=results_dir, database_id=id)
         elif table_name == "sizing":
-            simulate = Sizing(core_sim, params["num_levels"])
-            simulate.run(algorithm=params["algorithm"], results_dir=results_dir, database_id=id, debug=params["debug"])
+            simulate = Sizing(core_sim, params[NUM_LEVELS])
+            simulate.run(algorithm=params[ALGORITHM], results_dir=results_dir, database_id=id, debug=params[DEBUG])
+        elif table_name == "resilience":
+            resilience = Resilience(core_sim)
+            resilience.run(hours=params[NUM_SHIFT_HOURS], results_dir=results_dir, database_id=id, debug=params[DEBUG])
         else:
             raise ValueError("run_analysis unknown type = "+table_name)
     except Exception as error:

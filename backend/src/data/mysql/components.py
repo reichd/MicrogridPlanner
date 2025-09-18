@@ -127,8 +127,9 @@ def add(user_id, type_id:int, name, description, specifications):
         raise mysql_microgrid.MicrogridDBException("component_add select failed for spec_meta with component type id = " \
             +str(type_id)+"\n"+str(error))
     for key_val_tuple in component_defaults:
-        key = str(key_val_tuple[0])
-        if key not in specifications: specifications[key] = key_val_tuple[1]
+        key = key_val_tuple[0]
+        if key not in specifications and str(key) not in specifications: 
+            specifications[key] = key_val_tuple[1]
     val1, val2 = update_attributes(component_id, specifications)
     if not val1: return val1, val2
     return component_id, None
@@ -160,7 +161,8 @@ def types_get():
         component_spec_meta = mysql_microgrid.DB.query(
             """SELECT *
             FROM component_spec_meta
-            ORDER BY displayOrder""", output_format="dict")
+            WHERE visibility = %s
+            ORDER BY displayOrder""", values=[1], output_format="dict")
     except Exception as error:
         raise mysql_microgrid.MicrogridDBException("component_types_get failed for select component_spec_meta\n"+str(error))
     component_types_with_specs = {}

@@ -8,7 +8,7 @@ class CoreSimulation(object):
 
     def __init__(self, grid, energy_management_system_id, powerload_id, weather, 
                  start_datetime=None, end_datetime=None, 
-                 extend_proportion=0.0):
+                 extend_proportion=0.0, disturbance=None):
         """Simulation constructor __init__
 
         Keyword arguments:
@@ -19,14 +19,16 @@ class CoreSimulation(object):
         end_datetime                    datetime object set to end of simulation
         weather                         weather object with distributions
         extend_proportion               extend the timeframe by the specified proportion
+        disturbance                     object with disturbance event information
         """
         self.grid = grid
         self._energy_management_system = database_energy_management_systems.get_parameter_name(energy_management_system_id)
         self._powerload_id = powerload_id
         self._weather = weather
-        self._start_datetime = start_datetime
-        self._end_datetime = end_datetime
+        self.start_datetime = start_datetime
+        self.end_datetime = end_datetime
         self._extend_proportion = extend_proportion
+        self.disturbance = disturbance
         self.timesteps = None
         self._load()
 
@@ -37,18 +39,18 @@ class CoreSimulation(object):
         powerload_info = database_powerloads.get_single(self._powerload_id, objectFlag=True)
         start = powerload_info["startdatetime"]
         end = powerload_info["enddatetime"]
-        if self._start_datetime is not None:
-            if self._start_datetime < start - timedelta(seconds=1):
+        if self.start_datetime is not None:
+            if self.start_datetime < start - timedelta(seconds=1):
                 raise Exception("Simulation _load failed because start datetime specified is before beginning of powerload timeline.")
-            if self._start_datetime > end + timedelta(seconds=1):
+            if self.start_datetime > end + timedelta(seconds=1):
                 raise Exception("Simulation _load failed because start datetime specified is after end of powerload timeline.")
-            start = self._start_datetime
-        if self._end_datetime is not None:
-            if self._end_datetime < start - timedelta(seconds=1):
+            start = self.start_datetime
+        if self.end_datetime is not None:
+            if self.end_datetime < start - timedelta(seconds=1):
                 raise Exception("Simulation _load failed because end datetime specified is before the start datetime specified.")
-            if self._end_datetime > end  + timedelta(seconds=1):
+            if self.end_datetime > end  + timedelta(seconds=1):
                 raise Exception("Simulation _load failed because end datetime specified is after end of powerload timeline.")
-            end = self._end_datetime
+            end = self.end_datetime
         if end <= start:
             raise Exception("Simulation _load failed because end datetime specified does not occur after start datetime specified.")
         for i in range(0,len(powerload_info["data"])):
@@ -103,6 +105,23 @@ class CoreSimulation(object):
             time_periods.append(timestep.time_period())
         return time_periods
 
+    def _simulate_disturbance(self):
+        """Disturbance sets grid status at each time period"""
+        if self.disturbance is None: return
+        self.disturbance.simulate(self.grid)
+        online_ratio = self.disturbance.propogate(
+            grid=self.grid,
+            time_periods=self._get_time_periods(),
+        )
+        for timestep in self.timesteps:
+            timestep.set_online_ratio(online_ratio[timestep.time_period()])
+
+    def _clear_disturbance(self):
+        """Reset online ratio at each time period to 'None'"""
+        if self.disturbance is None: return
+        for timestep in self.timesteps:
+            timestep.set_online_ratio(None)
+
     def _operate_grid(self, timestep, previous_case=None):
         """Update grid parameters for input timestep, then generate power"""
         self._weather.update(timestep.time_period())
@@ -138,8 +157,10 @@ class CoreSimulation(object):
     def run(self):
         """Run simulation"""    
         diesel_level = self.grid.get_diesel_level()
+        self._simulate_disturbance()
         self._run()
         metrics = Metrics(self.timesteps)
+        self._clear_disturbance()
         self._clear_run(diesel_level)
         return metrics
 
@@ -153,10 +174,11 @@ class CoreSimulation(object):
 
     def der_sizing_initialize(self):
         """Return peak load and generator dict for sizing method"""
+        self._simulate_disturbance()
         return self.peak_load(), self.grid.get_generator_dict()
     
     def der_sizing_load_design(self, initial_energy_resources, design_specs):
         """a more generalized version may be needed
         design specs can currently only accomodate component ratings"""
         component_ratings = design_specs
-        self.grid.update_components_doe(initial_energy_resources, component_ratings)
+        self.grid.update_components(initial_energy_resources, component_ratings)

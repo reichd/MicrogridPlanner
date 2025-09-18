@@ -3,7 +3,6 @@ ajax_form.onsubmit = event => {
     event.preventDefault();
     if (document.querySelector(".g-recaptcha")) {
         grecaptcha.ready(() => {
-            console.log(document.querySelector(".g-recaptcha").dataset.sitekey);
             grecaptcha.execute(document.querySelector(".g-recaptcha").dataset.sitekey, {action: 'submit'}).then(captcha_token => {
                 process_form(ajax_form, captcha_token);
             });

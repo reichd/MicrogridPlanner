@@ -1,0 +1,71 @@
+{% extends 'tools/resilience/layout.html' %}
+
+{% block head3 %}
+<link rel="stylesheet" type="text/css" href="/static/css/grid-single.css" />
+<meta name="id" content="{{ id }}" />
+<meta name="mode" content="{{ mode }}" />
+{% endblock %}
+
+{% block content3 %}
+<div id="disturbance-repair-detail-root" data-mode="{{ mode }}" class="container-fluid">
+  <!-- Back Button -->
+  <div class="row mb-3">
+    <div class="col">
+      <a href="/tools/resilience/{{ method }}/{{ mode }}s/" class="btn btn-secondary text-white">
+        <i class="bi bi-arrow-left"></i> Back to {{ mode }}s
+      </a>
+    </div>
+  </div>
+
+  <form id="{{ mode }}-form" onsubmit="saveRecord(event)">
+    <!-- Title and Description Section -->
+    <div class="row mb-4">
+      <div class="col">
+        <div class="mb-3">
+          <label for="name" class="form-label">Name</label>
+          <input type="text" class="form-control" id="name" name="name" required maxlength="32">
+        </div>
+        <div class="mb-3">
+          <label for="description" class="form-label">Description</label>
+          <textarea class="form-control" id="description" name="description" maxlength="128"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Microgrid Selection Section -->
+    <div class="row mb-4">
+      <div class="col">
+        <div class="mb-3">
+          <h5>Microgrid: <strong id="grid-name" class="h5"></strong></h5>
+        </div>
+        <h5>Component Selection</h5>
+        <div id="instruction-text" class="text-muted small mb-2">
+        </div>
+        <div id="microgrid-components" style="display: none;">
+          <div class="row" id="components-compact-list">
+            <div class="accordion col" id="components-accordion-left"></div>
+            <div class="accordion col" id="components-accordion-right"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save Button -->
+    <div class="row">
+      <div class="col">
+        <button type="submit" class="btn btn-primary">Save All Changes</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div id="full-screen-loader" style="display: none;">
+  <div class="spinner-border" role="status">
+    <span class="sr-only">Loading...</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts3 %}
+<script src="/static/js/resilience/disturbance-repair-detail.js"></script>
+{% endblock %}

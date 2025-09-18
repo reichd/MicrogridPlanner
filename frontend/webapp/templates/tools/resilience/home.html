@@ -1,0 +1,16 @@
+{% extends 'tools/layout.html' %}
+
+{% block head2 %}
+<link rel="stylesheet" type="text/css" href="/static/css/simulate.css" />
+<link rel="stylesheet" type="text/css" href="/static/css/date-time-picker.css" />
+<link rel="stylesheet" type="text/css" href="/static/css/widgets.css" />
+{% endblock %}
+
+{% block content2 %}
+<h3>Resilience</h3>
+<br />
+    
+<div>Which resilience analysis method would you like to use?</div>
+<div><a href="deterministic/">Basic (recommended)</a></div>
+<div><a href="stochastic/">Advanced</a></div>
+{% endblock %}

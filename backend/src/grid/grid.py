@@ -302,7 +302,7 @@ class Grid(object):
                 case = 3 # continue running diesel to charge battery
         else:
             if photovoltaic + wind + battery_discharge + load >= 0 and \
-                    (abs(battery_charge) < defaults.EPSILON or (previous_case and previous_case in [2,4])):
+                    (abs(battery_charge) < defaults.EPSILON or (previous_case and previous_case in [1,2,4])):
                 case = 2 # use battery if fully charged or previously being used
             elif photovoltaic + wind + diesel_max + load >= 0:
                 case = 3
@@ -519,7 +519,7 @@ class Grid(object):
                 npv -= generator.residual_value(num_years) / (1+wacc)**num_years
         return npv
 
-    def update_components(self, ratings):
+    def update_components_deprecated(self, ratings):
         """Use only for grid with exactly 1 DieselGenerator, 1 Battery
         and 1 PhotovoltaicPanel to update capacities, when rightsizing grid"""
         for component in [
@@ -533,7 +533,7 @@ class Grid(object):
             else:
                 raise ValueError("Exactly 1 "+component+" is required in grid")
 
-    def update_components_doe(self, initial_energy_resources, ratings):
+    def update_components(self, initial_energy_resources, ratings):
         """Use initial_energy_resources"""
         self._generators = { k:v for k,v in initial_energy_resources.items() }
         for component in ratings:

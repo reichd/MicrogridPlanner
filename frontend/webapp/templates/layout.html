@@ -31,7 +31,7 @@
 
         <div id="navtop-links-container">
           <a href="{{ url_for('tools.home') }}"><i class="fas fa-lightbulb"></i>Tools</a>
-          <a href="https://github.com/reichd/MicrogridPlanner/" target="_blank"><i class="fas fa-code"></i>Code</a>          
+          <a href="https://github.com/reichd/MicrogridPlanner" target="_blank"><i class="fas fa-code"></i>Code</a>          
           <a href="{{ url_for('authentication.profile') }}"><i class="fas fa-user-circle"></i>
             {{ username if username else 'guest'}}</a>
           {% if role == 'Admin' %}
@@ -74,7 +74,7 @@
         <div>
           <span class="text-muted">Site hosted by <a href="https://www.nps.edu" target="_blank">Naval Postgraduate School</a></span>
           <br/>
-          <span class="text-muted">Contact <a href="mailto:microgrid@nps.edu">microgrid@nps.edu</a></span>
+          <span class="text-muted">Contact <a href="mailto:microgridplanner@nps.edu">microgridplanner@nps.edu</a></span>
         </div>
       </div>
     </footer>

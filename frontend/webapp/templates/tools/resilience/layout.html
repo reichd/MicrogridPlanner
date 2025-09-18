@@ -1,0 +1,40 @@
+{% extends 'tools/layout.html' %}
+
+{% block head2 %}
+{% block head3 %}{% endblock %}
+{% endblock %}
+
+{% block content2 %}
+{% if method in [ 'stochastic', 'deterministic' ] %}
+<div class="submenu">
+  <a href="{{ url_for('resilience.disturbances', method=method) }}">
+    <div class="submenu-item {% if active_sub_page == 'disturbances' %}active{% endif %}">
+      Disturbances
+    </div>
+  </a>
+  <a href="{{ url_for('resilience.repairs', method=method) }}">
+    <div class="submenu-item {% if active_sub_page == 'repairs' %}active{% endif %}" data-subpagename="results">
+      Repairs
+    </div>
+  </a>
+  <a href="{{ url_for('resilience.compute', method=method) }}">
+    <div class="submenu-item {% if active_sub_page == 'compute' %}active{% endif %}">Run Analysis</div>
+  </a>
+  <a href="{{ url_for('resilience.results', method=method) }}">
+    <div class="submenu-item {% if active_sub_page == 'results' %}active{% endif %}">Results</div>
+  </a>
+</div>
+<div id="method" style="display: none;">{{ method }}</div>
+<div id="method-type" style="display: none;">
+  {% if method in [ 'stochastic' ] %}no-wait{% else %}wait{% endif %}
+</div>
+
+{% block content3 %}{% endblock %}
+{% else %}
+<div class="alert">You are attempting to access a resilience method that does not exist. Please check the URL.</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% block scripts3 %}{% endblock %}
+{% endblock %}

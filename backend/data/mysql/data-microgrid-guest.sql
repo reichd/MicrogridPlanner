@@ -113,6 +113,66 @@ VALUES
 UNLOCK TABLES;
 
 
+-- Dumping data for table `disturbance`
+LOCK TABLES `disturbance` WRITE;
+INSERT INTO `disturbance`
+(`id`, `name`, `description`,`gridId`)
+VALUES
+(1,'Disturbance example','',4);
+UNLOCK TABLES;
+
+
+-- Dumping data for table `disturbance_data`
+LOCK TABLES `disturbance_data` WRITE;
+INSERT INTO `disturbance_data`
+(`disturbanceId`, `componentId`, `quantity`, `value`)
+VALUES
+(1,2,1,0.0),
+(1,1,1,0.0),
+(1,3,0,0.0),
+(1,4,1,0.0);
+UNLOCK TABLES;
+
+
+-- Dumping data for table `disturbance_user`
+LOCK TABLES `disturbance_user` WRITE;
+INSERT INTO `disturbance_user`
+(`disturbanceId`, `userId`, `permissionId`)
+VALUES
+(1,2,1);
+UNLOCK TABLES;
+
+
+-- Dumping data for table `repair`
+LOCK TABLES `repair` WRITE;
+INSERT INTO `repair`
+(`id`, `name`, `description`,`gridId`)
+VALUES
+(1,'Repair example','',4);
+UNLOCK TABLES;
+
+
+-- Dumping data for table `repair_data`
+LOCK TABLES `repair_data` WRITE;
+INSERT INTO `repair_data`
+(`repairId`, `componentId`, `value`)
+VALUES
+(1,2,96),
+(1,1,120),
+(1,3,114),
+(1,4,6);
+UNLOCK TABLES;
+
+
+-- Dumping data for table `repair_user`
+LOCK TABLES `repair_user` WRITE;
+INSERT INTO `repair_user`
+(`repairId`, `userId`, `permissionId`)
+VALUES
+(1,2,1);
+UNLOCK TABLES;
+
+
 -- Dumping data for table `powerload`
 LOCK TABLES `powerload` WRITE;
 INSERT INTO `powerload`

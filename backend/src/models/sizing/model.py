@@ -268,9 +268,8 @@ class Sizing(object):
         """heuristic algorithm first performs an exact search on a small instance size,
         then maps the solutions identified to a finer grid specified by the input number of levels,
         performs a binary search for designs followed by a linear search to refine those designs"""
-        if self.num_levels <= 6: raise ValueError("num_levels must be at least 6 to run heuristic")
         print("starting exact search",datetime.datetime.now().time().strftime("%H:%M:%S"), flush=True)
-        self._run_exact(num_levels=6)
+        self._run_exact(num_levels=min(self.num_levels, 6))
         self._generate_levels(self.num_levels)
         self._map_to_finer_grid()
         print("starting binary search",datetime.datetime.now().time().strftime("%H:%M:%S"), flush=True)

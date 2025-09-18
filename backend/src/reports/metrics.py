@@ -1,6 +1,7 @@
 import os
 import csv
 import io
+import statistics
 from src.utils import helpers
 from src.components import defaults
 import src.data.mysql.mysql_microgrid as mysql_microgrid
@@ -15,7 +16,10 @@ class Metrics(object):
         Keyword arguments:
         timesteps          list of TimeStep objects
         """
-        self.power, self.deficit = _power(timesteps)
+        self.timesteps = timesteps
+        self.power, self.deficit, self.load, self.supply = _power(timesteps)
+        self.load_peak = max(list(self.load.values()))
+        self.load_median = statistics.median(list(self.load.values()))
         self.state_of_charge = _state_of_charge(timesteps)
         self.power_availability_ratio = _power_availability_ratio(timesteps)
         self.load_satisfaction_ratio = _load_satisfaction_ratio(timesteps)
@@ -151,15 +155,19 @@ def _power(timesteps):
     """Power dictionary"""
     power = {}
     deficit = {}
+    load = {}
+    supply = {}
     types = _generator_types(timesteps[0])
     for timestep in timesteps:
         power[timestep] = {}
         power[timestep][defaults.LOAD] = -1 * timestep.power_load()
+        load[timestep] = timestep.power_load()
+        supply[timestep] = max(0.0, timestep.grid_state().available_power_all())
         deficit[timestep] = -1 * timestep.power_load()
         for type in types:
             power[timestep][type] = timestep.grid_state().power_supply_type(type)
             deficit[timestep] += power[timestep][type]
-    return power, deficit
+    return power, deficit, load, supply
 
 def _state_of_charge(timesteps):
     """State of charge dictionary"""

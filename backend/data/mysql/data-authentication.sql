@@ -3,8 +3,8 @@ LOCK TABLES `user` WRITE;
 INSERT INTO `user`
 (`id`, `username`, `password`, `email`, `role`, `activation_code`, `rememberme`, `reset`, `registered`, `last_seen`, `tfa_code`, `ip`)
 VALUES
-(1, 'admin', 'admin', 'microgrid@nps.edu', 'Admin', 'activated', '', '', '2023-02-22 19:30:00', '2023-02-22 19:30:00', '', ''),
-(2, 'guest', 'guest', 'microgrid@nps.edu', 'Guest', 'activated', '', '', '2023-02-22 19:30:00', '2023-02-22 19:30:00', '', '');
+(1, 'admin', 'admin', 'microgridplanner@nps.edu', 'Admin', 'activated', '', '', '2023-02-22 19:30:00', '2023-02-22 19:30:00', '', ''),
+(2, 'guest', 'guest', 'microgridplanner@nps.edu', 'Guest', 'activated', '', '', '2023-02-22 19:30:00', '2023-02-22 19:30:00', '', '');
 UNLOCK TABLES;
 
 

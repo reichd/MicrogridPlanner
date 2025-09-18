@@ -6,7 +6,7 @@ const powerloadGraphLineColor = "#FFA500";
 // Empties and hides all chart containers
 const clearCharts = () => {
   const chartIds = ["components-chart", "excess-power-chart", "charge-chart"];
-  $("#chart-container").addClass("chart-hidden");
+  $("#results-container").addClass("results-hidden");
   chartIds.forEach(id => {
     if (apexCharts[id]) {
       // Destroy apex instance if it exists
@@ -228,7 +228,7 @@ const buildAllApexCharts = (data, componentTypes, filename) => {
     decimalsInFloat: 1
   });
 
-  $("#chart-container").removeClass("chart-hidden");
+  $("#results-container").removeClass("results-hidden");
 
 };
 

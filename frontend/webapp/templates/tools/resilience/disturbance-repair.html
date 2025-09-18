@@ -1,0 +1,16 @@
+{% extends 'tools/resilience/layout.html' %}
+
+{% block head3 %}
+<link rel="stylesheet" type="text/css" href="/static/css/widgets.css" />
+{% endblock %}
+
+{% block content3 %}
+<div id="disturbance-repair-root" data-mode="{{ mode }}">
+  {% include 'tools/layout-all-widget.html' %}
+</div>
+{% endblock %}
+
+{% block scripts3 %}
+<script src="/static/js/resilience/helpers.js"></script>
+<script src="/static/js/resilience/disturbance-repair.js"></script>
+{% endblock %}

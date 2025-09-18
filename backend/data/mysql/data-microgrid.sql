@@ -52,7 +52,7 @@ VALUES
 (9,2,'Wind Turbine Investment Cost ($)','wt_investment_cost','float',NULL,0.01,NULL,1,8),
 (10,2,'Wind Turbine OM Annual Cost ($)','wt_om_cost','float',NULL,0,NULL,1,9),
 (11,3,'Diesel Generator Load (proportion)','dg_load','proportion',1,0.01,1,1,2),
-(12,3,'Diesel Generator Min Load (proportion)','dg_min_load','proportion',0.6,0,1,0,3),
+(12,3,'Diesel Generator Min Load (proportion)','dg_min_load','proportion',0.6,0,1,1,3),
 (13,3,'Diesel Generator EPG efficiency (proportion)','dg_epg_efficiency','proportion',0.40,0.01,1.0,1,4),
 (14,3,'Diesel Generator Power (kW)','dg_power','float',NULL,0.01,NULL,1,1),
 (15,3,'Diesel Generator Startup Delay (hours)','dg_startup_delay','float',0,0,NULL,0,5),

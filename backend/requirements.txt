@@ -22,3 +22,4 @@ paramiko==3.3.1
 Werkzeug==2.2.2
 sqlalchemy==2.0.27
 nrel-pysam==5.1.0
+argon2-cffi>=21.3.0

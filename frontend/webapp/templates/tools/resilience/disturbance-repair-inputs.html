@@ -1,0 +1,49 @@
+
+<div id="repair-select-container" class="form-group col-md-3">
+  <label for="repair-selection">Repair</label>
+  <select id="repair-selection" name="repair_id" required class="form-select" aria-label="Repair select"
+    aria-describedby="grid-makeup-help">
+    <option value="" selected disabled>Select a repair</option>
+  </select>
+</div>
+
+<div id="disturbance-select-container" class="form-group col-md-3">
+  <label for="disturbance-selection">Disturbance</label>
+  <select id="disturbance-selection" name="disturbance_id" required class="form-select"
+    aria-label="Disturbance select" aria-describedby="disturbance-help">
+    <option value="" selected disabled>Select a disturbance</option>
+  </select>
+</div>
+
+<div class="form-group col-md-4 datetime-container">
+  <div class="d-flex">
+    <div class="date-container">
+      <label for="disturbance_startdate">Disturbance Start</label>
+      <input type="text" class="form-control" required id="disturbance_startdate"
+        aria-describedby="disturbance_startdate-help" autocomplete="off" disabled>
+    </div>
+    <div class="time-container">
+      <label for="disturbance_starttime"></label>
+      <input type="text" class="form-control" required id="disturbance_starttime"
+        aria-describedby="disturbance_starttime-help" autocomplete="off" disabled>
+    </div>
+  </div>
+  <div id="disturbance_startdate-feedback" class="invalid-feedback">
+    Please enter a valid date (mm/dd/yyyy).
+  </div>
+</div>
+
+<div id="disturbance-shift-hours-select-container" class="form-group col-md-2">
+  <label for="disturbance-shift-hours-selection"># Hours to Shift</label>
+  <select id="disturbance-shift-hours-selection" name="disturbance_shift_hours" required class="form-select"
+    aria-label="select # hours to shift" aria-describedby="disturbance-shift-hours-help">
+    <option value="0" selected>Use default (24 hours)</option>
+    <option value="12">12</option>
+    <option value="36">36</option>
+    <option value="48">48</option>
+    <option value="60">60</option>
+    <option value="72">72</option>
+    <option value="84">84</option>
+    <option value="96">96</option>
+  </select>
+</div>

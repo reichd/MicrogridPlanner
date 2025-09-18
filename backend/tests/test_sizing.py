@@ -49,9 +49,9 @@ def test_sizing():
         run_helpers.STARTDATETIME:startdatetime,
         run_helpers.ENDDATETIME:enddatetime,
         run_helpers.WEATHER_SAMPLE_METHOD : "mean",
-        "num_levels":11,
-        "algorithm":"heuristic",
-        "debug":"False",
+        run_helpers.NUM_LEVELS:11,
+        run_helpers.ALGORITHM:"heuristic",
+        run_helpers.DEBUG:"False",
     }
 
     # run simulate method (stores results to database)

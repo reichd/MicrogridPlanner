@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS `user` (
   `last_seen` timestamp,
   `tfa_code` varchar(255) NOT NULL DEFAULT '',
   `ip` varchar(255) NOT NULL DEFAULT '',
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  UNIQUE (`username`)
 );
 
 -- Table `login_attempts`

@@ -1,0 +1,7 @@
+{% if method == 'stochastic' %}
+<div class="form-group col-md-2">
+    <label for="num-runs">Num runs</label>
+    <input type="number" min="1" max="500" value="1" step="1" class="form-control" name="num_runs" required
+        id="num-runs" aria-describedby="num_runs-help" autoComplete="off" />
+</div>
+{% endif %}

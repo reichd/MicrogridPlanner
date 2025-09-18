@@ -51,6 +51,7 @@ class SolarPhotovoltaicPanel(Generator):
 
     def update(self, power_rating):
         self._power_rating = power_rating
+        self._pvwatts_system_model = None
     
     def _get_pvwatts_system_model(self):
         """Return PVwatts system model"""

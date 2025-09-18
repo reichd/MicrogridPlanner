@@ -1,4 +1,3 @@
-
 // Map summary stat keys to image URL
 const statsToImageUrl = {
   "Battery": "/static/images/Battery.png",
@@ -26,6 +25,12 @@ const buildSpecList = (list) => {
     </div>
   `);
 };
+
+function toTitleCase(str) {
+    return str.replace(/(?:^|\s)\w/g, function(match) {
+        return match.toUpperCase();
+    });
+}
 
 // Takes a component and builds the header (Image with title and component type)
 const buildComponentHeader = (options) => {
@@ -83,9 +88,13 @@ const apiReq = async (url, type, postData) => {
 
     if (res.processed) {
       responseObj.data = res.data;
+      responseObj.processed = true;
+      responseObj.status_message = res.status_message;
     }
     else {
       responseObj.error = res.status_message ? res.status_message : defaultErrorMessage;
+      responseObj.processed = false;
+      responseObj.status_message = res.status_message;
     }
   }
   catch (err) {
@@ -116,6 +125,7 @@ const apiReq = async (url, type, postData) => {
     else {
       responseObj.error = defaultErrorMessage.concat(" API error (see console log for details)");
     }
+    responseObj.processed = false;
   }
 
   return responseObj;
@@ -273,31 +283,6 @@ const preventDecimal = (el, e) => {
   }  
 };
 
-// Set a custom validation message using max and min input values
-const setCustomMaxMinValidationMessage = (el) => {
-  let message = `Value not allowed`;
-  const val = parseFloat(el.value);
-  console.log("is numeric string", isNumericString(el.min), isNumericString(el.max))
-  switch(true) {
-  // If outside of max or min
-  case (isNumericString(el.min) && isNumericString(el.max) && (val < parseFloat(el.min) || val > parseFloat(el.max))):
-    message = `Please enter a value between ${el.min} and ${el.max}`;
-    break;
-  // Case for min with no max
-  case (isNumericString(el.min) && !isNumericString(el.max) && val < parseFloat(el.min)):
-    message = `Please enter a value greater than ${el.min}`;
-    break
-  // Case for min with no max
-  case (isNumericString(el.max) && !isNumericString(el.min) && val > parseFloat(el.max)):
-    message = `Please enter a value less than than ${el.max}`;
-    break;
-  case (el.step === "1" && val !== Math.floor(el.value)):
-    message = `Please enter a whole number` // Decimal on an integer (step = "1")
-    break;
-  }
-  el.setCustomValidity(message);
-};
-
 // Takes spec data and returns a number input (string) with validation
 const createNumberInput = (item) => {
   let {id, value, minVal, maxVal} = item;
@@ -326,9 +311,7 @@ const createNumberInput = (item) => {
       step="${item.parameterType === "integer" ? "1" : "any"}"
       name="${id}" 
       ${isNumber(value) ? `value=${value}` : ""}
-      required="true"
-      oninvalid="setCustomMaxMinValidationMessage(this)"
-      oninput="setCustomValidity('')">
+      required="true">
     </input>
   `)
 };
@@ -571,12 +554,12 @@ const addModalEvents = () => {
   $("#confirm-delete-modal").on("hidden.bs.modal", closeConfirmDeleteModal)
 };
 
-// Takes an array of results and returns them where "completed" (normally 0 or 1) 
-// is switched to a message (Fail, Success, or In Progress)
-const formatResultsStatus = (success) => {
-  return success === 0 ? "Failure" : success === 1 ? "Success" : "In progress";
+const formatResultsStatus = (success, computeJobId) => {
+  if (success === 0) return "Failure";
+  if (success === 1) return "Success";
+  if (computeJobId == null) return "Failed to submit";
+  return "In progress";
 };
-
 
 const createCompactSpecList = (component) => {
   const componentTypeId = Object.keys(componentTypes).find(ct => {
@@ -667,28 +650,87 @@ const createCompactComponentsList = (options) => {
 
 // Takes powerload data and returns a powerload widget 
 // that displays powerload metadata and first 10 rows of the table
-const createPowerloadWidget = (powerload, elId, timeframe) => {
-  $(elId).append(`
-    <h5>Powerload</h5>
-    <div class="card" style="width: 100%">
+const createPowerloadWidget = (powerload, elId, timeframe, showDelete = false) => {
+  const deleteButtonHtml = showDelete ? 
+  `<a href="#" id="${powerload.id}-open-confirm-delete-btn" data-id="${powerload.id}" class="card-link float-end delete">Delete</a>` 
+  : '';
+  
+  if (showDelete) {
+    $(elId).append(`
+      <h5>${powerload.name}</h5>
       <div class="card-body">
-        <div class="d-flex justify-content-between">
-          <h5 class="card-title">${powerload.name}</h5>
-          <div>
-            <a href="/tools/powerloads/${powerload.id}" class="card-link float-start" target="_blank">View</a>
+        <div>
+          ${timeframe ? `<div class="text-secondary">${timeframe}</div>` : ""}
+          <div class="card-text description">${powerload.description}</div>
+          <img src="${powerload.image}"/>
+        </div>
+        <div>
+          <a href="/tools/powerloads/${powerload.id}" class="card-link float-start">View</a>
+          ${deleteButtonHtml}
+        </div>
+      </div>
+    `);
+  } else {
+    $(elId).append(`
+      <h5>Powerload</h5>
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0 flex-grow-1" style="flex-basis: 75%;">${powerload.name}</h5>
+          <div style="flex-basis: 25%;" class="text-end">
+            <a href="/tools/powerloads/${powerload.id}" class="card-link" target="_blank">View</a>
           </div>
         </div>
         ${timeframe ? `<div class="text-secondary">${timeframe}</div>` : ""}
         <div class="card-text description">${powerload.description}</div>
         <div id="texttest"></div>
       </div>
-    </div>
-  `);
+    `);
+    buildGraphPowerloadApex({
+      data: powerload.data, 
+      ...miniPowerloadDimensions,
+      strokeWidth: 1,
+      name: powerload.name,
+      graphElId: "texttest"
+    });
+  }
+};
+
+// initialize variable to store powerload data for graph updates
+let currentPowerloadData = null;
+
+// Function to update powerload graph based on current date/time selections
+const updatePowerloadGraph = () => {
+  if (!currentPowerloadData) return;
+  
+  //declaring these to get the most updated values, otherwise, would grab the initial values on page load
+  const startDate = $("#startdate").val();
+  const endDate = $("#enddate").val();
+  const startTime = $("#starttime").val();
+  const endTime = $("#endtime").val();
+  
+  // If dates are not set, don't update
+  if (!startDate || !endDate) return;
+  
+  const startDateTime = new Date(`${startDate} ${startTime}`);
+  const endDateTime = new Date(`${endDate} ${endTime}`);
+  
+  // Filter data based on selected date/time range
+  const filteredData = currentPowerloadData.data.filter(d => {
+    const dataTime = new Date(d.middatetime);
+    return dataTime >= startDateTime && dataTime <= endDateTime;
+  });
+  
+  // Update the timeframe text
+  const newTimeframe = getTimeFrameStringReadable(startDateTime, endDateTime);
+  $("#powerload .text-secondary").text(newTimeframe);
+  
+  // Update the graph with filtered data
+  $("#texttest").empty();
   buildGraphPowerloadApex({
-    data: powerload.data, 
+    data: filteredData,
     ...miniPowerloadDimensions,
     strokeWidth: 1,
-    name: powerload.name,
+    name: currentPowerloadData.name,
     graphElId: "texttest"
   });
 };
@@ -751,26 +793,38 @@ const createGridCardComponentList = (grid) => {
   `)
 };
 
-// Takes grid data and returns a grid card that displays
-// grid metadata and all it's components
-const createGridWidget = (grid, elId, title) => {
+const createGridWidget = (grid, elId, showDelete = false) => {
   const gridUrl = `/tools/${grid.isSizingTemplate ? "sizing/" : ""}microgrids/${grid.id}`;
-  $(elId).append(`
-    <h5>${title}</h5>
-    <div class="card grid-widget" style="width: 100%">
+  const deleteButtonHtml = showDelete ? 
+  `<a href="#" id="${grid.id}-open-confirm-delete-btn" data-name="microgrids" class="card-link float-end delete">Delete</a>` 
+  : '';
+  if (showDelete) {
+    $(elId).append(`
+      <h5>${grid.name}</h5>
       <div class="card-body">
-        <div class="d-flex justify-content-between">
-          <h5 class="card-title">${grid.name}</h5>
-          <a href="${gridUrl}" class="card-link float-start" target="_blank">View</a>
+        ${createGridCardComponentList(grid)}
+        <div>
+          <a href="${gridUrl}" class="card-link float-start">View</a>
+          ${deleteButtonHtml}
+        </div>
+      </div>
+    `);
+  } else {
+    $(elId).append(`
+      <h5>Microgrid</h5>
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0 flex-grow-1" style="flex-basis: 75%;">${grid.name}</h5>
+          <div style="flex-basis: 25%;" class="text-end">
+            <a href="${gridUrl}" class="card-link" target="_blank">View</a>
+          </div>
         </div>
         ${createGridCardComponentList(grid)}
       </div>
-    </div>
-  `);
+    `);
+  }
 };
 
-// Takes grid data and returns a grid card that displays
-// grid metadata and all it's components
 const createEnergyManagementSystemWidget = (energyManagementSystem, elId, title) => {
   $(elId).append(`
     <h5>${title}</h5>
@@ -785,11 +839,74 @@ const createEnergyManagementSystemWidget = (energyManagementSystem, elId, title)
   `);
 };
 
-const createWidget = (widgetFunction, inputName, elId, formVals, data, widgetTitle) => {
-  $(elId).show();
-  $(elId).empty();
-  const selectedItem = data.find(i => i.id === parseInt(formVals[inputName]));
-  widgetFunction(selectedItem, elId, widgetTitle);
+// Utility functions for parsing disturbances and repairs by grid id in compute forms
+const getDisturbancesByGridId = async (gridId = null) => {
+  const disturbances = await getData("resilience_disturbances_get");
+  if (gridId) {
+    return disturbances.filter(d => d.gridId == gridId);
+  }
+  return disturbances;
+};
+
+const getRepairsByGridId = async (gridId = null) => {
+  const repairs = await getData("resilience_repairs_get");
+  if (gridId) {
+    return repairs.filter(r => r.gridId == gridId);
+  }
+  return repairs;
+};
+
+const getGridById = async (gridId) => {
+  const gridRes = await postData("grids_get", null, {"id": gridId});
+  return gridRes.data;
+}
+
+const getComponentTypes = async() =>{
+  const componentTypes = await getData("component_types");
+  return componentTypes
+}
+
+// Populates the disturbance dropdown with options
+const populateDisturbanceDropdown = (disturbances, selectedId = null) => {
+  // Clear existing options
+  $("#disturbance-selection").find('option:not(:first)').remove();
+  
+  // Add disturbance options with gridId data attribute
+  disturbances.forEach(d => {
+    $("#disturbance-selection").append(`<option value="${d.id}" data-grid-id="${d.gridId}">${d.name}</option>`);
+  });
+  
+  // Set selected value if provided, otherwise clear selection
+  if (selectedId) {
+    $("#disturbance-selection").val(selectedId);
+  } else {
+    $("#disturbance-selection").val("");
+    $("#disturbance-selection").trigger('change');
+  }
+};
+// Populates the repair dropdown with options
+const populateRepairDropdown = (repairs, selectedId = null) => {
+  // Clear existing options
+  $("#repair-selection").find('option:not(:first)').remove();
+  
+  // Add repair options with gridId data attribute
+  repairs.forEach(r => {
+    $("#repair-selection").append(`<option value="${r.id}" data-grid-id="${r.gridId}">${r.name}</option>`);
+  });
+  
+  // Set selected value if provided, otherwise clear selection
+  if (selectedId) {
+    $("#repair-selection").val(selectedId);
+  } else {
+    $("#repair-selection").val("");
+    $("#repair-selection").trigger('change');
+  }
+};
+
+// Sets the disabled/enabledstate of the disturbance and repair dropdowns
+const setDisturbanceRepairDropdownsState = (enabled) => {
+  $("#disturbance-selection").prop('disabled', !enabled);
+  $("#repair-selection").prop('disabled', !enabled);
 };
 
 // Handles country selection and sets region dropdowns
@@ -832,189 +949,65 @@ const handleRegionSelection = async (e) => {
   }
 };
 
+//window.isInitialLoadFromPreviousJob = true;
+
+function loadingPreviousJob() {
+  return window.location.search.includes("id=");
+}
+
+// Helper to parse datetime strings
+function parseDateTimeString(dateTimeStr) {
+  // Handles "YYYY-MM-DD HH:mm:ss" and "YYYY-MM-DDTHH:mm:ss"
+  if (typeof dateTimeStr === "string" && dateTimeStr.includes(" ")) {
+    return new Date(dateTimeStr.replace(" ", "T"));
+  }
+  return new Date(dateTimeStr);
+}
+
 // Handle powerload selection, including setting up start and end dates
 const handlePowerloadSelection = async (e) => {
   let defaultStartDate = e.data.defaultStartDate;
   let defaultEndDate = e.data.defaultEndDate;
+  let defaultDisturbanceStartDate = e.data.defaultDisturbanceStartDate;
 
-  // Get powerload graph data
+  // Get powerload data
   const powerloadRes = await postData("powerloads_get", null, {id: e.target.value});
+  
+  if (!powerloadRes.data) {
+    console.error("Failed to load powerload data");
+    return;
+  }
 
-  const startDateEl = $("#startdate");
-  const endDateEl = $("#enddate");
-  const startTimeEl = $("#starttime");
-  const endTimeEl = $("#endtime");
-  let minDate = new Date(powerloadRes.data.startdatetime);
-  let maxDate = new Date(powerloadRes.data.enddatetime);
-  defaultStartDate = defaultStartDate ? new Date(defaultStartDate) : minDate;
-  defaultEndDate = defaultEndDate ? new Date(defaultEndDate) : maxDate;
+  // Store powerload data globally for graph updates
+  currentPowerloadData = powerloadRes.data;
 
-  startDateEl.prop("disabled", false);
-  endDateEl.prop("disabled", false);
-  startTimeEl.prop("disabled", false);
-  endTimeEl.prop("disabled", false);
-  const minDateString = getDateString(new Date(minDate));
-  const maxDateString = getDateString(new Date(maxDate));
-  const defaultStartDateString = getDateString(new Date(defaultStartDate));
-  const defaultEndDateString = getDateString(new Date(defaultEndDate));
-  const timeframe = getTimeFrameStringReadable(defaultStartDate, defaultEndDate)
+  // Determine which defaults to use:
+  // - If loading a previous job AND this is the initial load, use the loaded job's defaults
+  if (loadingPreviousJob() && window.isInitialLoadFromPreviousJob) {
+    if (defaultStartDate) defaultStartDate = parseDateTimeString(defaultStartDate);
+    if (defaultEndDate) defaultEndDate = parseDateTimeString(defaultEndDate);
+    if (defaultDisturbanceStartDate) defaultDisturbanceStartDate = parseDateTimeString(defaultDisturbanceStartDate);
+  } else {
+    defaultStartDate = null;
+    defaultEndDate = null;
+    defaultDisturbanceStartDate = null;
+  }
+  initializeDateTimePickers(currentPowerloadData, defaultStartDate, defaultEndDate, defaultDisturbanceStartDate);
 
-
+  // Create powerload widget
+  if (!defaultStartDate) defaultStartDate = new Date(currentPowerloadData.startdatetime);
+  if (!defaultEndDate) defaultEndDate = new Date(currentPowerloadData.enddatetime);
+  if (!defaultDisturbanceStartDate) defaultDisturbanceStartDate = defaultStartDate;
+  const timeframe = getTimeFrameStringReadable(defaultStartDate, defaultEndDate);
   $("#powerload").show();
   $("#powerload").empty();
-  createPowerloadWidget(powerloadRes.data, "#powerload", timeframe);
+  createPowerloadWidget(currentPowerloadData, "#powerload", timeframe, false);
 
-  $("#startdate").val(defaultStartDateString);
-  $("#enddate").val(defaultEndDateString);
-
-  initDatePicker({
-    elId: "#startdate", 
-    otherDateElId: "#enddate", 
-    thisTimeId: "#starttime", 
-    otherTimeId: "#endtime", 
-    minDate, 
-    maxDate, 
-    defaultDate: defaultStartDate,
-    otherDateConstraint: "minDate",
-    otherTimeConstraint: "minTime",
-    otherTimeDefaultVal: "00:00",
-    thisTimeConstraint: "maxTime",
-    thisTimeDefaultVal: "23:30",
-    defaultDateConstraint: minDateString,
-    dateOperator: "<"
-  });
-
-  initDatePicker({
-    elId: "#enddate", 
-    otherDateElId: "#startdate", 
-    thisTimeId: "#endtime", 
-    otherTimeId: "#starttime", 
-    minDate, 
-    maxDate, 
-    defaultDate: defaultEndDate,
-    otherDateConstraint: "maxDate",
-    otherTimeConstraint: "maxTime",
-    otherTimeDefaultVal: "23:30",
-    thisTimeConstraint: "minTime",
-    thisTimeDefaultVal: "00:00",
-    defaultDateConstraint: maxDateString,
-    dateOperator: ">"
-  });
-
-  initTimePicker({
-    elId: "#starttime", 
-    otherElId: "#endtime",
-    otherConstraint: "minTime",
-    maxTime: "23:30", 
-    minTime: minDate,  
-    defaultTime: getTimeString({date: defaultStartDate, withSeconds: false})
-  });
-
-  initTimePicker({
-    elId: "#endtime", 
-    otherElId: "#starttime",
-    otherConstraint: "maxTime",
-    maxTime: maxDate, 
-    minTime: "00:00",
-    defaultTime: getTimeString({date: defaultEndDate, withSeconds: false})
-  });
-
-
-  var inst = $.datepicker._getInst($("#startdate")[0]);
-  $.datepicker._get(inst, 'onSelect').apply(inst.input[0], [$("#startdate").datepicker('getDate'), inst]);
-
-  var inst2 = $.datepicker._getInst($("#enddate")[0]);
-  $.datepicker._get(inst2, 'onSelect').apply(inst2.input[0], [$("#enddate").datepicker('getDate'), inst2]);
-
-  handleMaxMinTimeChange($("#starttime").val(), "#endtime", "minTime")
-  handleMaxMinTimeChange($("#endtime").val(), "#starttime", "maxTime")
-  
-};
-
-const handleGridSelection = (e) => {
-  const selectedId = parseInt(e.target.value);
-  const grid = e.data.grids.find(g => g.id === selectedId);
-  $("#grid").show();
-  $("#grid").empty();
-  createGridWidget(grid, "#grid", "Microgrid");
-};
-
-const handleEnergyManagementSystemSelection = (e) => {
-  const selectedId = parseInt(e.target.value);
-  const ems = e.data.energyManagementSystems.find(e => e.id === selectedId);
-  $("#energy-management-system").show();
-  $("#energy-management-system").empty();
-  createEnergyManagementSystemWidget(ems, "#energy-management-system", "Energy Management System");
-};
-
-// Takes an option object for resetting charts, summary stats and optional default selections
-// Populates form inputs and adds event listeners.
-const populateForm = async (options) => {
-  const { isSizing, defaultSelections, defaultLocations} = options;
-  const grids = await getData(isSizing ? "sizing_grids_get" : "grids_get");
-  const energyManagementSystems = await getData("energy_management_systems");
-  const powerloads = await getData("powerloads_get");
-  const locations = await getData("locations_get");
-  const countryArray = locations.map(k => { return ({name: k, id: k}) });
-  const gridsWithComponents = grids.filter(grid => grid.components.length > 0);
-  
-  let defaultGrid;
-  let defaultEnergyManagementSystem;
-  let defaultPowerload;
-  let defaultStartDate;
-  let defaultEndDate;
-  let defaultRegion;
-  let defaultLocationId;
-
-  /// Set defaults (if any)
-  if (defaultSelections) {
-    defaultStartDate = defaultSelections.startdatetime;
-    defaultEndDate = defaultSelections.enddatetime;
-    defaultPowerload = defaultSelections.powerloadId;
-    defaultEnergyManagementSystem = defaultSelections.energyManagementSystemId;
-    defaultGrid = defaultSelections.gridId;
-    defaultRegion= defaultLocations ? defaultLocations.region : "";
-    defaultLocationId = defaultSelections.locationId;
+  // Mark initial load as complete after first powerload selection
+  if (loadingPreviousJob() && window.isInitialLoadFromPreviousJob) {
+    // Set a flag to indicate we're no longer in initial load mode
+    window.isInitialLoadFromPreviousJob = false;
   }
-
-  // Manually set microgrid label text for sizing
-  if (isSizing) {
-    $("#grid-selection").parent().find("label").text("Microgrid Sizing Template");
-    $("#default-sizing-option").text("Select a microgrid sizing template");
-  }
-
-  // Populate dropdowns with data lists
-  populateDropdown($("#grid-selection"), gridsWithComponents, defaultGrid);
-  populateDropdown($("#energy-management-system-selection"), energyManagementSystems, defaultEnergyManagementSystem);
-  populateDropdown($("#powerload-selection"), powerloads, defaultPowerload);
-  populateDropdown($("#country-selection"), countryArray);
-
-  $(".widget").hide();
-
-  // OnChange event for ALL inputs to reset charts & stats
-  $("#form :input").change((e) => {
-    clearSummaryStats();
-    if (!isSizing) {
-      clearCharts(); // Charts don't display on sizing compute page
-    }
-  });
-
-  // Set specific data and event handlers for each input
-  $("#grid-selection").change({grids}, handleGridSelection);
-  $("#energy-management-system-selection").change({energyManagementSystems}, handleEnergyManagementSystemSelection);
-  $("#powerload-selection").change({defaultStartDate, defaultEndDate}, handlePowerloadSelection);
-  $("#region-selection").change({defaultLocationId}, handleRegionSelection);
-  $("#country-selection").change({defaultRegion}, handleCountrySelection);
-
-  // Trigger change of default selections to force display of data in form and widgets
-  if (defaultLocations) {
-    $("#country-selection").val(defaultLocations.country).change();
-    $("#grid-selection").change();
-    $("#energy-management-system-selection").change();
-    $("#powerload-selection").change();
-  }
-
-  
 };
 
 // Removes all options from dropdown except disabled
@@ -1056,7 +1049,205 @@ const displayStats = (stats) => {
       })
     }
   });
+};
 
+const handleGridSelection = async (e) => {
+  const selectedGridId = parseInt(e.target.value);
+  const selectedGrid = e.data.grids.find(g => g.id === selectedGridId);
+  // Enable/disable disturbance and repair dropdowns based on grid selection
+  if (selectedGridId) {
+    setDisturbanceRepairDropdownsState(true);
+    // Get filtered disturbances and repairs for the selected grid
+    const filteredDisturbances = await getDisturbancesByGridId(selectedGridId);
+    const filteredRepairs = await getRepairsByGridId(selectedGridId);
+    // Preserve existing selections if they exist in the filtered options
+    const currentDisturbanceId = $("#disturbance-selection").val();
+    const currentRepairId = $("#repair-selection").val();
+    // Check if current selections are valid for the new grid
+    const validDisturbanceId = filteredDisturbances.some(d => d.id == currentDisturbanceId) ? currentDisturbanceId : null;
+    const validRepairId = filteredRepairs.some(r => r.id == currentRepairId) ? currentRepairId : null;
+    
+    // Populate dropdowns with filtered options, preserving valid selections
+    populateDisturbanceDropdown(filteredDisturbances, validDisturbanceId);
+    populateRepairDropdown(filteredRepairs, validRepairId);
+    $("#grid").show();
+    $("#grid").empty()
+    createGridWidget(selectedGrid, "#grid", false);
+    $("#resilience-cards .disturbance-card").remove();
+    $("#resilience-cards .repair-card").remove();
+  } else {
+    setDisturbanceRepairDropdownsState(false);
+    $("#grid").hide();
+    $("#grid").empty();
+    $("#resilience-cards .disturbance-card").remove();
+    $("#resilience-cards .repair-card").remove();
+  }
+};
+
+const handleEnergyManagementSystemSelection = (e) => {
+  const selectedId = parseInt(e.target.value);
+  const ems = e.data.energyManagementSystems.find(e => e.id === selectedId);
+  $("#energy-management-system").show();
+  $("#energy-management-system").empty();
+  createEnergyManagementSystemWidget(ems, "#energy-management-system", "Energy Management System");
+};
+
+const handleDisturbanceRepairSelection = async (e) => {
+  const fieldType = e.currentTarget.id.split('-')[0];
+  const selectedId = parseInt(e.target.value);
+  if (selectedId) {
+    let record = null;
+    if (fieldType == "disturbance"){
+      record = e.data.disturbances.find(d => d.id === selectedId);
+    } else {
+      record = e.data.repairs.find(d => d.id === selectedId);
+    }
+    if (record){
+      const grid = await getGridById(record.gridId);
+      const componentTypes = await getComponentTypes();
+      const method = $("#method").text().trim();
+      $(`#${fieldType}-card`).show();
+      $(`#${fieldType}-card`).empty();
+      createDisturbanceRepairWidget(record, grid, method, fieldType, componentTypes, `#${fieldType}-card`, false)
+    }
+  } else {
+    // Hide the card if no selection is made
+    $(`#${fieldType}-card`).hide().empty();
+  }
+};
+
+const handleRepairSelection = (e) => {
+  const selectedGridId = parseInt(e.target.value);
+  const repair = e.data.repairs.find(r => r.id === selectedGridId);
+  // placeholder for future widget
+  if(selectedGridId) {
+  }
+};
+
+// Takes an option object for resetting charts, summary stats and optional default selections
+// Populates form inputs and adds event listeners.
+const populateForm = async (options) => {
+  const { isSizing, defaultSelections, defaultLocations, includeDisturbance} = options;
+  
+  // Set initial load flag for previous job loading
+  if (loadingPreviousJob()) {
+    window.isInitialLoadFromPreviousJob = true;
+  }
+  const grids = await getData(isSizing ? "sizing_grids_get" : "grids_get");
+  const energyManagementSystems = await getData("energy_management_systems");
+  const powerloads = await getData("powerloads_get");
+  const locations = await getData("locations_get");
+  const countryArray = locations.map(k => { return ({name: k, id: k}) });
+  const gridsWithComponents = grids.filter(grid => grid.components.length > 0);
+  let disturbances = null;
+  let repairs = null;
+  if (includeDisturbance) { 
+    disturbances = await getDisturbancesByGridId();
+    repairs = await getRepairsByGridId();
+  }
+
+  let defaultGrid;
+  let defaultEnergyManagementSystem;
+  let defaultPowerload;
+  let defaultStartDate;
+  let defaultEndDate;
+  let defaultRegion;
+  let defaultLocationId;
+  let defaultDisturbanceId;
+  let defaultDisturbanceStartDate;
+  let defaultNumShiftHours;
+  let defaultRepairId;
+
+  /// Set defaults (if any)
+  if (defaultSelections) {
+    defaultStartDate = defaultSelections.startdatetime;
+    defaultEndDate = defaultSelections.enddatetime;
+    defaultPowerload = defaultSelections.powerloadId;
+    defaultEnergyManagementSystem = defaultSelections.energyManagementSystemId;
+    defaultGrid = defaultSelections.gridId;
+    defaultRegion= defaultLocations ? defaultLocations.region : "";
+    defaultLocationId = defaultSelections.locationId;
+    defaultDisturbanceId = defaultSelections.disturbanceId;
+    defaultDisturbanceStartDate = defaultSelections.disturbanceStartdatetime;
+    defaultNumShiftHours = defaultSelections.numShiftHours;
+    defaultRepairId = defaultSelections.repairId;
+  }
+
+  // Manually set microgrid label text for sizing
+  if (isSizing) {
+    $("#grid-selection").parent().find("label").text("Microgrid Sizing Template");
+    $("#default-sizing-option").text("Select a microgrid sizing template");
+  }
+
+  // Populate dropdowns with data lists
+  populateDropdown($("#grid-selection"), gridsWithComponents, defaultGrid);
+  populateDropdown($("#energy-management-system-selection"), energyManagementSystems, defaultEnergyManagementSystem);
+  populateDropdown($("#powerload-selection"), powerloads, defaultPowerload);
+  populateDropdown($("#country-selection"), countryArray);
+  
+  // Disable disturbance and repair dropdowns initially
+  setDisturbanceRepairDropdownsState(false);
+
+  if (includeDisturbance) { 
+    // Set number of shift hours
+    const shiftHoursValue = defaultNumShiftHours !== undefined ? defaultNumShiftHours : "0";
+    $("#disturbance-shift-hours-selection").val(shiftHoursValue).change();
+
+    // If there's a default grid, filter the options
+    if (defaultGrid) {
+      // Get filtered disturbances and repairs for the default grid
+      const filteredDisturbances = await getDisturbancesByGridId(defaultGrid);
+      const filteredRepairs = await getRepairsByGridId(defaultGrid);
+      
+      // Populate dropdowns with filtered options
+      populateDisturbanceDropdown(filteredDisturbances, defaultDisturbanceId);
+      populateRepairDropdown(filteredRepairs, defaultRepairId);
+      
+      // Enable the dropdowns
+      setDisturbanceRepairDropdownsState(true);
+    } else {
+      // Populate with all options (will be filtered when grid is selected)
+      populateDisturbanceDropdown(disturbances, defaultDisturbanceId);
+      populateRepairDropdown(repairs, defaultRepairId);
+    }
+  }
+
+  $(".widget").hide();
+
+  // OnChange event for ALL inputs to reset charts & stats
+  $("#form :input").change((e) => {
+    clearSummaryStats();
+    if (!isSizing) {
+      clearCharts(); // Charts don't display on sizing compute page
+    }
+  });
+
+  // Set specific data and event handlers for each input
+  $("#grid-selection").change({grids}, handleGridSelection);
+  $("#energy-management-system-selection").change({energyManagementSystems}, handleEnergyManagementSystemSelection);
+  $("#powerload-selection").change({defaultStartDate, defaultEndDate, defaultDisturbanceStartDate}, handlePowerloadSelection);
+  $("#region-selection").change({defaultLocationId}, handleRegionSelection);
+  $("#country-selection").change({defaultRegion}, handleCountrySelection);
+  // placeholders for future disturbance and repair widgets
+  $("#disturbance-selection").change({disturbances}, handleDisturbanceRepairSelection);
+  $("#repair-selection").change({repairs}, handleDisturbanceRepairSelection);
+
+  // Trigger change of default selections to force display of data in form and widgets
+  if (defaultLocations) {
+    $("#country-selection").val(defaultLocations.country).change();
+    $("#grid-selection").change();
+    $("#energy-management-system-selection").change();
+    $("#powerload-selection").change();
+  } else if (defaultSelections) {
+    // When loading a previous job without locations, still trigger the necessary changes
+    $("#grid-selection").change();
+    $("#energy-management-system-selection").change();
+    $("#powerload-selection").change();
+  }
+  if (includeDisturbance) { 
+    $("#disturbance-selection").change();
+    $("#repair-selection").change();
+  }
 };
 
 // Handles deleting a result from results pages
@@ -1081,4 +1272,147 @@ function handleOpenConfirmDeleteResult(e) {
   $("#delete-btn").data("id", computeId);
   $("#delete-btn").data("page", page);
   $("#confirm-delete-modal").modal("show");
+}
+
+// enables run button after computation terminates
+const resetButtons = (elementId) => {
+  $("#load-btn").hide();
+  $("#compute-btn").show();
+  const alertEl = $(`${elementId} .alert`);
+  if (alertEl) { alertEl.alert("close") }
+};
+
+// disables run button when computation starts
+const setButtonsLoading = () => {
+  $("#compute-btn").hide();
+  $("#load-btn").show();
+};
+
+// show message during computational run
+const createComputeTimeAlert = (elementId) => {
+  $(elementId).append(`
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      The run may take a few minutes to complete. If you navigate away from this page, the run will continue. When complete, the results will be accessible through your simulation history.
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  `);
+}
+
+// set result id in url
+const setIdInURL = (id) => {
+  const urlParams = new URLSearchParams(window.location.search);
+  urlParams.set("id", id);
+  window.history.pushState({}, document.title, window.location.pathname + `?id=${id}`);
+}
+
+// get result id from url
+const getIdFromURL = () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  let id = null
+  if (urlParams.has("id")) {
+    id = parseInt(urlParams.get("id"));
+  }
+  return id;
+}
+
+// get result id from url
+const deleteIdFromURL = () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  let id = null
+  if (urlParams.has("id")) {
+    id = parseInt(urlParams.get("id"));
+  }
+  return id;
+}
+
+// initialize run analysis page
+const initializeComputeForm = async (apiEndpoint, options) => {
+    let resultsRes = null;
+    let locationRes = null;
+    const resultId = getIdFromURL()
+    if (resultId) {
+      resultsRes = await postData(apiEndpoint, null, {id: resultId});
+      locationRes =  await postData("locations_get", null, {id: resultsRes.data.locationId});
+    }
+  
+    await populateForm({
+      isSizing: options.isSizing ? options.isSizing : false,
+      defaultSelections: resultsRes ? resultsRes.data : false,
+      defaultLocations: locationRes ? locationRes.data : false,
+      includeDisturbance: options.includeDisturbance ? options.includeDisturbance : false
+    });
+    
+    setTimeout(() => {
+      if (resultId) {
+        $("#compute-btn").click();
+      }
+      //reminder to go back to solve async issue
+      //console.log("1 second has passed");
+    }, 1000);
+
+}
+
+// wait for an analysis to complete, then run a callback function
+const waitForResult = (apiEndpoint, resultId, elementId, callback, ...callbackArgs) => {
+  let isFirstCheck = true;
+  return new Promise((resolve) => {
+    const checkResult = async () => {
+      const successRes = await postData(apiEndpoint, null, { id: resultId });
+      if (successRes.data.success === null) {
+        if (isFirstCheck) { createComputeTimeAlert(elementId); }
+        isFirstCheck = false;
+        setTimeout(checkResult, 15000); //the params are avail through checkResult() from the outer function of waitForResult, no longer need to add them here
+      } 
+      else if (successRes.data.success) {
+        if (callback) callback(...callbackArgs);
+        resetButtons(elementId);
+        resolve(true);
+      }
+      else {
+        openAlert("danger", "#tool-error", "Run failed. Please contact admin for more information.");
+        resetButtons(elementId);
+        resolve(false);
+      }
+    };
+    checkResult();
+  });
+};
+
+// run an analysis method and wait for the results
+const runAnalysisAndWait = async (customFormData, computeApiEndpoint, resultApiEndpoint, elementId, callback) => {
+  deleteIdFromURL();
+  const powerloadWindow = currentPowerloadData ? initializePowerloadWindow(currentPowerloadData) : null;
+  validatePowerloadDateTimeInputs(powerloadWindow, null)
+  const formData = getValuesFromForm($("#form"));
+  const dateTimeData = getFormDateTimes();
+  const allFormData = {...formData, ...dateTimeData, ...(customFormData !== null ? customFormData : {})};
+  const computeRes = await postData(computeApiEndpoint, null, allFormData);
+  if (!computeRes.error) {
+    setIdInURL(computeRes.data.compute_id)
+    await waitForResult(resultApiEndpoint, computeRes.data.compute_id, elementId,
+                        callback, computeRes.data.compute_id);
+  } else {
+    resetButtons(elementId);
+  }
+};
+
+// run an analysis method and do not wait for the results
+const runAnalysisAndNoWait = async (customFormData, computeApiEndpoint, elementId) => {
+  const powerloadWindow = currentPowerloadData ? initializePowerloadWindow(currentPowerloadData) : null;
+  validatePowerloadDateTimeInputs(powerloadWindow, null)
+  const formData = getValuesFromForm($("#form"));
+  const dateTimeData = getFormDateTimes();
+  const allFormData = {...formData, ...dateTimeData, ...(customFormData !== null ? customFormData : {})};
+  const computeRes = await postData(computeApiEndpoint, null, allFormData);
+  if (!computeRes.error) {
+    if (computeRes.data.compute_job_id !== null) {
+      displayToastMessage(`Job submitted with Slurm ID ${computeRes.data.compute_job_id}.`);
+    }
+    else {
+      const message = `Analysis has previously been submitted with result ID ${computeRes.data.compute_id}.
+      If you wish to recompute the analysis, first delete the existing result.`;
+      openAlert("warning", "#warning-container", message);
+    }
+  }
+  resetButtons(elementId);
 }

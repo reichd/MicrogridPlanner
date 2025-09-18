@@ -283,7 +283,7 @@ button i, .bi-x-lg {
   margin-top: 30px;
 }
 
-#chart-container {
+#results-container {
   margin-top: 40px;
   margin-bottom: 40px;
   display: flex;
@@ -293,7 +293,7 @@ button i, .bi-x-lg {
   min-width: 1300px;
 }
 
-#chart-container.chart-hidden {
+#results-container.results-hidden {
   opacity: 0;
   height: 0px;
   margin: 0px;

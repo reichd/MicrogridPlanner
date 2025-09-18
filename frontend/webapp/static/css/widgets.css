@@ -1,6 +1,8 @@
 .widget-container {
   width: 100%;
   gap: 30px;
+  display: flex;
+  justify-content: flex-start;
 }
 
 .widget {
@@ -61,14 +63,51 @@
   -webkit-box-orient: vertical;
 }
 
+/* Specific styling for resilience component cards */
+.resilience-text-secondary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  -webkit-box-orient: vertical;
+  white-space: nowrap;
+  padding-right: 9px;
+}
+
+/* Tooltip functionality for truncated text */
+.tooltip-on-hover {
+  position: relative;
+  will-change: transform;
+}
+
+.tooltip-on-hover:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 1;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
 
 .widget .components-mini-list .d-flex {
   background-color: #F3F4F7;
   padding: 10px;
   width: 46%;
   float: left;
-  margin-top: 15px;
-  margin-right: 15px;
+  margin-top: 8px;
+  margin-right: 8px;
   height: 90px;
 }
 
@@ -109,3 +148,154 @@
   font-size: .8rem;
 }
 
+/* Add scroll and flex for long component lists */
+.widget-data.components-mini-list {
+  max-height: 196px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .25rem .25rem;
+}
+
+/* Hide scrollbar by default, show on hover */
+.widget-data.components-mini-list::-webkit-scrollbar {
+  width: 8px;
+  display: none;
+}
+
+.widget-data.components-mini-list:hover::-webkit-scrollbar {
+  display: block;
+}
+
+.widget-data.components-mini-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.widget-data.components-mini-list::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 6px;
+}
+
+/* Custom scrollbar styling */
+.widget-data.components-mini-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.widget-data.components-mini-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.widget-data.components-mini-list::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 6px;
+}
+
+.widget-data.components-mini-list > div {
+  min-width: 0;   
+  margin-bottom: 0;
+  height: 90px;
+}
+
+/* Radial Health Gauge Widget Styles */
+#health-gauges {
+  display: flex;
+  flex-direction: row;
+  gap: 2rem;
+  justify-content: flex-start;
+  align-items: stretch;
+}
+
+.gauge-bar-container {
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+.gauge-bar-bg {
+  background: #e0e0e0;
+  border-radius: 8px;
+  width: 80%;
+  height: 22px;
+  margin-right: 16px;
+  overflow: hidden;
+  position: relative;
+}
+.gauge-bar {
+  height: 100%;
+  border-radius: 8px 0 0 8px;
+  transition: width 0.5s;
+}
+.gauge-red {
+  background: #e74c3c;
+}
+.gauge-yellow {
+  background: #f1c40f;
+}
+.gauge-green {
+  background: #27ae60;
+}
+.gauge-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  min-width: 48px;
+  text-align: right;
+  color: #222;
+}
+
+.health-gauge-widget.radial {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 2px 2px 8px 0px rgba(0,0,0,0.10);
+  width: 200px;
+  min-width: 170px;
+  padding: 18px 0 10px 0;
+  margin: 20px 0;
+}
+.gauge-radial-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 125px;
+  height: 125px;
+  position: relative;
+}
+.gauge-radial-svg {
+  display: block;
+}
+.gauge-bg {
+  stroke: #e0e0e0;
+}
+.gauge-arc {
+  transition: stroke-dashoffset 0.7s cubic-bezier(.4,2,.6,1), stroke 0.3s;
+}
+.gauge-radial-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  fill: #222;
+  dominant-baseline: middle;
+}
+.gauge-label.radial {
+  margin-top: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+  word-break: break-word;
+  max-width: 140px;
+}
+
+.gauge-status-label {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.gauge-card-subtitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}

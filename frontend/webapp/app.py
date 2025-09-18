@@ -9,6 +9,7 @@ from blueprints.toplevel import toplevel_blueprint
 from blueprints.tools import tools_blueprint
 from blueprints.simulate import simulate_blueprint
 from blueprints.sizing import sizing_blueprint
+from blueprints.resilience import resilience_blueprint 
 
 CONFIG_ENV = dotenv_values(os.path.join(os.path.dirname(os.getcwd()),"database-authentication.env"))
 CONFIG_INI = configparser.ConfigParser()
@@ -45,6 +46,7 @@ app.register_blueprint(toplevel_blueprint, url_prefix="/")
 app.register_blueprint(tools_blueprint, url_prefix="/tools/")
 app.register_blueprint(simulate_blueprint, url_prefix="/tools/simulate/")
 app.register_blueprint(sizing_blueprint, url_prefix="/tools/sizing/")
+app.register_blueprint(resilience_blueprint, url_prefix="/tools/resilience/")
 
 if __name__ == "__main__":
     app.run(

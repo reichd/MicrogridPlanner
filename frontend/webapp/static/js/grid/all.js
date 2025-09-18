@@ -24,32 +24,18 @@ function buildList() {
   $("#title").text(`${numGrids} ${pageTitle}${numGrids > 1 ? "s" : ""}`);
   $('#list').empty();
 
-  if (grids.length === 0) {
-    $('#no-grids-message').show();
-  }
+  grids.length === 0 ? $('#no-records-message').show() : $('#no-records-message').hide();
+  const $card = $(`<div class="widget"></div>`);
 
-  else {
-    $('#no-grids-message').hide();
-
-    // Map out grids using Bootstrap cards
-    grids.forEach(grid => {
-      $("#list").append(`
-        <div class="widget">
-          <h5>${grid.name}</h5>
-            <div class="card-body">
-              ${createGridCardComponentList(grid)}
-              <div>
-                <a href="${grid.id}" class="card-link float-start">View</a>
-                <a href="#" id="${grid.id}-open-confirm-delete-btn" data-name="microgrids" class="card-link float-end delete">
-                  Delete
-                </a>
-              </div>
-          </div>
-        </div>
-      `);
-      $(`#${grid.id}-open-confirm-delete-btn`).on('click', (e) => handleOpenConfirmDelete(e, grid));
+  grids.forEach(grid => {
+    createGridWidget(grid, "#list", true);
+    $("#list").children(":not(.widget)").wrapAll($card);
+    
+    $(`#${grid.id}-open-confirm-delete-btn`).on('click', (e) => {
+      e.preventDefault();
+      handleOpenConfirmDelete(e, grid);
     });
-  }
+  });
 }
 
 function handleUserQuotaCheck(el, e) {
@@ -77,14 +63,33 @@ async function create(e) {
 // Opens the confirm delete modal and displays additional information
 async function handleOpenConfirmDelete(e, grid) {
   openConfirmDeleteModal(e, grid, deleteGrid);
-  const results = await getData("sizing_results_get");
-  const gridResults = results.filter(r => r["Microgrid Sizing Template ID"] === grid.id);
-
+  let results = await getData("sizing_results_get");
+  let gridResults = results.filter(r => r["gridId"] === grid.id);
   if (gridResults.length > 0) {
     createRelatedDataList(
       gridResults, 
       "The following microgrid sizing results will also be deleted:", 
-      "Result ID"
+      "id"
+    )
+  }
+
+  results = await getData("simulate_results_get");
+  gridResults = results.filter(r => r["gridId"] === grid.id);
+  if (gridResults.length > 0) {
+    createRelatedDataList(
+      gridResults, 
+      "The following microgrid simulate results will also be deleted:", 
+      "id"
+    )
+  }
+
+  results = await getData("resilience_results_get");
+  gridResults = results.filter(r => r["gridId"] === grid.id);
+  if (gridResults.length > 0) {
+    createRelatedDataList(
+      gridResults, 
+      "The following microgrid resilience results will also be deleted:", 
+      "id"
     )
   }
 

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "microgrid-backend"
+description = "Backend for Microgrid Planner"
+version = "0.0.0"
+dynamic = ["dependencies"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}

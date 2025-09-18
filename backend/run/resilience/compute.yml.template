@@ -1,0 +1,11 @@
+---
+# comment out unused parameters; parameters specified by command-line take precendence
+grid_id: 100 # database id of sizing grid template
+powerload_id: 1 # database id of power load
+location_id: 145612 # database id of location
+energy_management_system_id: 1 # database id of energy management system
+disturbance_startdatetime: 2020-09-01_00:00:00 # datetime for start of disturbance
+disturbance_id: 1000 # database id of disturbance
+extend_timeframe: 0.5 # proportion to extend timeframe
+repair_id:10000 # database id of repair
+num_runs: 1 # number of iterations to simulate

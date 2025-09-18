@@ -55,6 +55,17 @@ class GridState(object):
                 non_degraded_power += power
         return non_degraded_power
 
+    def available_power_all(self):
+        """Total power available to meet load, including BESS"""
+        available_power = 0.0
+        for generator, power in self._available_power.items():
+            if generator.__class__.__name__ in [
+                defaults.BATTERY,
+            ] and power < 0.0:
+                continue
+            available_power += power
+        return available_power
+
     def available_power(self):
         """Total power available to meet load (and charge BESS)"""
         available_power = 0.0

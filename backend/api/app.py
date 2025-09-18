@@ -12,6 +12,10 @@ from blueprints.grids import grids_blueprint
 from blueprints.locations import locations_blueprint
 from blueprints.metadata import metadata_blueprint
 from blueprints.powerloads import powerloads_blueprint
+from blueprints.resilience.compute import resilience_compute_blueprint
+from blueprints.resilience.results import resilience_results_blueprint
+from blueprints.resilience.disturbances import resilience_disturbances_blueprint
+from blueprints.resilience.repairs import resilience_repairs_blueprint
 from blueprints.simulate.compute import simulate_compute_blueprint
 from blueprints.simulate.results import simulate_results_blueprint
 from blueprints.sizing.compute import sizing_compute_blueprint
@@ -27,7 +31,7 @@ CONFIG_INI_GLOBAL.read(os.path.join(os.path.dirname(os.getcwd()),"config.ini"))
 if not mysql_authentication.DB.exists() or mysql_authentication.DB.num_tables() == 0:
     make_data.authentication_database(
         drop_create_db=True,
-        load_data_dev=True,
+        load_data_dev=False,
     )
 
 if not mysql_microgrid.DB.exists() or mysql_microgrid.DB.num_tables() == 0:
@@ -69,6 +73,10 @@ app.register_blueprint(grids_blueprint, url_prefix='/api/grids')
 app.register_blueprint(locations_blueprint, url_prefix='/api/locations')
 app.register_blueprint(metadata_blueprint, url_prefix='/api/metadata')
 app.register_blueprint(powerloads_blueprint, url_prefix='/api/powerloads')
+app.register_blueprint(resilience_disturbances_blueprint, url_prefix='/api/resilience/disturbances')
+app.register_blueprint(resilience_repairs_blueprint, url_prefix='/api/resilience/repairs')
+app.register_blueprint(resilience_compute_blueprint, url_prefix='/api/resilience/compute')
+app.register_blueprint(resilience_results_blueprint, url_prefix='/api/resilience/results')
 app.register_blueprint(simulate_compute_blueprint, url_prefix='/api/simulate/compute')
 app.register_blueprint(simulate_results_blueprint, url_prefix='/api/simulate/results')
 app.register_blueprint(sizing_compute_blueprint, url_prefix='/api/sizing/compute')

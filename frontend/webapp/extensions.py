@@ -4,7 +4,7 @@ from flask_mysqldb import MySQL
 from functools import wraps
 from datetime import datetime, timedelta, timezone
 import jwt
-import hashlib
+from argon2 import PasswordHasher
 import configparser
 
 CONFIG_INI = configparser.ConfigParser()
@@ -52,9 +52,18 @@ def json_web_token(user_id, secret_key, admin=False):
     except Exception as e:
         return e
 
-def hash_secret(str_to_hash, secret_key):
+def hash_generate(str_to_hash, secret_key):
     """Generates a hash"""
-    return hashlib.sha1((str_to_hash + secret_key).encode()).hexdigest()
+    ph = PasswordHasher()
+    return ph.hash(str_to_hash + secret_key)
+
+def hash_verify(hashed_password, plain_text_password, secret_key):
+    """Returns true if the hash is valid"""
+    ph = PasswordHasher()
+    try:
+        return ph.verify(hashed_password, plain_text_password + secret_key)
+    except Exception:
+        return False
 
 def clear_session_data(login_redirect=False):
     """Clear the session data and cookies"""

@@ -1,5 +1,5 @@
 import os
-import hashlib
+from argon2 import PasswordHasher
 from dotenv import dotenv_values
 from src.data.mysql.mysql_core import MySqlDatabase
 
@@ -22,9 +22,10 @@ def make_data_passwords(secret_key, admin_password):
         users = DB.query("SELECT username, password, id FROM user", output_format="dict")
     except Exception as error:
         raise AuthenticationDBException("make_data_passwords select failed "+"\n"+str(error))
+    ph = PasswordHasher()
     for user in users:
         if user["username"] == "admin": user["password"] = admin_password
-        hashed_password = hashlib.sha1((user["password"] + secret_key).encode()).hexdigest()
+        hashed_password = ph.hash(user["password"] + secret_key)
         try:
             DB.update(
                 "user",

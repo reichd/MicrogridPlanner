@@ -38,9 +38,9 @@ async function build() {
     const date = new Date(d.middatetime);
     return date >= startDate && date <= endDate;
   });
-  createPowerloadWidget(powerloadRes.data, "#powerload", timeframe);
+  createPowerloadWidget(powerloadRes.data, "#powerload", timeframe, false);
   createEnergyManagementSystemWidget(energyManagementSystem, "#energy-management-system", "Energy Management System");
-  createGridWidget(gridRes.data, "#grid", "Microgrid Sizing Template");
+  createGridWidget(gridRes.data, "#grid", false);
 
   $("#full-screen-loader").hide();
   $("#location-name").append(`
@@ -78,7 +78,6 @@ async function build() {
     };
 
   if (sizingGrids.length > 0) {
-    console.log("sizing grids, column keys", sizingGrids, columnKeys)
     const table = tabulateSizingGrids(sizingGrids, columnKeys);
     $("#sizing-grids").append(table);
     $("#download-btn").show();
@@ -150,7 +149,7 @@ function tabulateSizingGrids(grids, columnKeys) {
       }
       
       else {
-        let val = grid[key] > .0001 ? formatValue(grid[key]) : 0;
+        let val = (grid[key] > .0001 || grid[key] < -.0001) ? formatValue(grid[key]) : 0;
         rowHtml += `<td>${val}</td>`
       }
     });

@@ -12,9 +12,9 @@ import subprocess
 import run.helpers as run_helpers
 from src.data.mysql import mysql_microgrid
 import src.data.mysql.users as database_users
-from src.data.mysql import simulate, sizing
+from src.data.mysql import simulate, sizing, resilience
 
-DATABASES = {"simulate": simulate, "sizing": sizing}
+DATABASES = {"simulate": simulate, "sizing": sizing, "resilience": resilience}
 
 CONFIG_INI_GLOBAL = configparser.ConfigParser()
 CONFIG_INI_GLOBAL.read(os.path.join(os.path.dirname(os.getcwd()),"config.ini"))
@@ -27,6 +27,7 @@ SLURM_USERNAME = CONFIG_INI.get("SLURM","USERNAME",fallback=None)
 SLURM_WORKING_DIRECTORY = CONFIG_INI.get("SLURM","WORKING_DIRECTORY",fallback=".")
 SLURM_RUN_LOCAL = CONFIG_INI.getboolean("SLURM","BYPASS_SLURM_RUN_LOCAL",fallback=False)
 SLURM_FORCE_RECOMPUTE = CONFIG_INI.getboolean("SLURM","FORCE_RECOMPUTE",fallback=False)
+MAX_RESILIENCE_RUNS = CONFIG_INI.getint("QUOTA","RESILIENCE_RUNS")
 
 mail = Mail()
 
@@ -232,6 +233,35 @@ def result_add_to_database(user_id, table_name):
             raise ValueError("User does not have permission to access load")
     except Exception as error:
         raise RuntimeError("Error in blueprint checking user permissions\n"+str(error))
+    if table_name == "resilience":
+        num_shift_hours = int(request_dict[run_helpers.NUM_SHIFT_HOURS]) if run_helpers.NUM_SHIFT_HOURS in request_dict else 0
+        num_runs = int(request_dict[run_helpers.NUM_RUNS]) if run_helpers.NUM_RUNS in request_dict else 1
+        if num_runs > MAX_RESILIENCE_RUNS:
+            raise ValueError("num runs = {0} exceeds allowed limit of {1}".format(num_runs, MAX_RESILIENCE_RUNS))
+        disturbance_id = request_dict[run_helpers.DISTURBANCE_ID]
+        try:
+            disturbance_startdatetime = parser.parse(request_dict[run_helpers.DISTURBANCE_STARTDATETIME])
+        except Exception as error:
+            raise ValueError("disturbance startdatetime not defined\n"+str(error))
+        repair_id = request_dict[run_helpers.REPAIR_ID]
+        extend_timeframe = float(request_dict[run_helpers.EXTEND_TIMEFRAME]) \
+            if run_helpers.EXTEND_TIMEFRAME in request_dict else 1.0
+        method = request_dict[run_helpers.METHOD]
+        try:
+            if not database_users.has_permissions(user_id, disturbance_id, "disturbance", "read"):
+                raise ValueError("User does not have permission to access disturbance")
+            if not database_users.has_permissions(user_id, repair_id, "repair", "read"):
+                raise ValueError("User does not have permission to access repair")
+        except Exception as error:
+            raise RuntimeError("Error in resilience blueprint checking user permissions\n"+str(error))
+    else:
+        disturbance_id = None
+        disturbance_startdatetime = None
+        repair_id = None
+        extend_timeframe = None
+        num_runs = None
+        num_shift_hours = None
+        method = None
     id = DATABASES[table_name].MODEL_HELPERS.result_get_by_params(
         grid_id=grid_id,
         energy_management_system_id=energy_management_system_id,
@@ -239,6 +269,13 @@ def result_add_to_database(user_id, table_name):
         location_id=location_id,
         startdatetime=startdatetime,
         enddatetime=enddatetime,
+        disturbance_id=disturbance_id,
+        disturbance_startdatetime=disturbance_startdatetime,
+        repair_id=repair_id,
+        extend_timeframe=extend_timeframe,
+        num_shift_hours=num_shift_hours,
+        num_runs=num_runs,
+        method=method,
     )
     if SLURM_FORCE_RECOMPUTE:
         DATABASES[table_name].MODEL_HELPERS.remove(id)
@@ -252,6 +289,13 @@ def result_add_to_database(user_id, table_name):
             location_id=location_id,
             startdatetime=startdatetime,
             enddatetime=enddatetime,
+            disturbance_id=disturbance_id,
+            disturbance_startdatetime=disturbance_startdatetime,
+            repair_id=repair_id,
+            extend_timeframe=extend_timeframe,
+            num_shift_hours=num_shift_hours,
+            num_runs=num_runs,
+            method=method,
         )
 
 def ssh_to_slurm(command):

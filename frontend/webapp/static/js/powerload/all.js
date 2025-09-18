@@ -31,45 +31,23 @@ async function buildList() {
   currentPowerload = null;
   $("#list").empty();
 
-  if (powerloads.length === 0) {
-    $('#no-powerloads-message').show();
-  }
+  powerloads.length === 0 ? $('#no-records-message').show() : $('#no-records-message').hide();
 
-  else {
+  const $card = $(`<div class="widget"></div>`);
+
+  powerloads.forEach(powerload => {
+    const timeframe = getTimeFrameStringReadable(powerload.startdatetime, powerload.enddatetime);
     
-    if (powerloads.length === 0) {
-      $('#no-powerloads-message').show();
-    }
-
-    else {
-      $('#no-powerloads-message').hide();
-      // Map out grids using Bootstrap cards
-      powerloads.forEach(powerload => {
-        const timeframe = getTimeFrameStringReadable(powerload.startdatetime, powerload.enddatetime);
-        $("#list").append(`
-          <div class="widget">
-            <h5>${powerload.name}</h5>
-            <div class="card-body">
-              <div>
-                ${timeframe ? `<div class="text-secondary">${timeframe}</div>` : ""}
-                <div class="card-text description">${powerload.description}</div>
-                <img src="${powerload.image}"/>
-              </div>
-              <div>
-                <a href="${powerload.id}" id="${powerload.id}-edit-btn" data-id="${powerload.id}" class="card-link float-start">View</a>
-                <a href="#" id="${powerload.id}-open-confirm-delete-btn" data-id="${powerload.id}" class="card-link float-end delete">Delete</a>
-              </div>
-            </div>
-          </div>
-        `);
-        $(`#${powerload.id}-open-confirm-delete-btn`).on('click', (e) => handleOpenConfirmDelete(e, powerload));
-      });
-    }
-
-  }
+    createPowerloadWidget(powerload, "#list", timeframe, true);
+    $("#list").children(":not(.widget)").wrapAll($card);
+    
+    $(`#${powerload.id}-open-confirm-delete-btn`).on('click', (e) => {
+      e.preventDefault();
+      handleOpenConfirmDelete(e, powerload)
+    });
+  });
 
   $("#full-screen-loader").hide();
-
 }
 
 function handleUpload(e) {
@@ -172,14 +150,33 @@ function handleUpload(e) {
 // Opens the confirm delete modal and displays additional information
 async function handleOpenConfirmDelete(e, powerload) {
   openConfirmDeleteModal(e, powerload, deletePowerload);
-  const results = await getData("sizing_results_get");
-  const powerloadResults = results.filter(r => r["Powerload ID"] === powerload.id);
-
+  let results = await getData("simulate_results_get");
+  let powerloadResults = results.filter(r => r["powerloadId"] === powerload.id);
   if (powerloadResults.length > 0) {
     createRelatedDataList(
       powerloadResults, 
-      "The following microgrid sizing results will also be deleted:", 
-      "Result ID"
+      "The following simulation results will also be deleted:", 
+      "id"
+    )
+  }
+
+  results = await getData("sizing_results_get");
+  powerloadResults = results.filter(r => r["powerloadId"] === powerload.id);
+  if (powerloadResults.length > 0) {
+    createRelatedDataList(
+      powerloadResults, 
+      "The following sizing results will also be deleted:", 
+      "id"
+    )
+  }
+
+  results = await getData("resilience_results_get");
+  powerloadResults = results.filter(r => r["powerloadId"] === powerload.id);
+  if (powerloadResults.length > 0) {
+    createRelatedDataList(
+      powerloadResults, 
+      "The following resilience results will also be deleted:", 
+      "id"
     )
   }
 

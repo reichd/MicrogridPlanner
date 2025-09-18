@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, make_response, flash
 from flask import current_app as app
 from flask_mail import Message
-from extensions import mail, mysql, clear_session_data, display_user, json_web_token, hash_secret
+from extensions import mail, mysql, clear_session_data, display_user, json_web_token, hash_generate, hash_verify
 import MySQLdb.cursors, re, uuid, datetime, os, math, urllib, json
 import configparser
 import requests
@@ -65,7 +65,7 @@ def azure_account_register(email):
 	Return account info"""
 	account = azure_account_is_registered(email)
 	if account: return account
-	hashed_password = hash_secret(secrets.token_urlsafe(20), app.secret_key)
+	hashed_password = hash_generate(secrets.token_urlsafe(20), app.secret_key)
 	cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 	cursor.execute('INSERT INTO user (username, password, email, activation_code, role, ip) VALUES (%s, %s, %s,%s, %s, %s)', (email, hashed_password, email, _ACCOUNT_STATUS_ACTIVATED, "Member", request.environ['REMOTE_ADDR'],))
 	mysql.connection.commit()
@@ -122,11 +122,17 @@ def create_session_data(account, rememberme=False, respond_success=True):
 			else make_response(redirect(url_for('toplevel.home')))
 	admin_flag = account['role'] == "Admin"
 	resp.set_cookie('jwt', json_web_token(account['id'], app.secret_key, admin=admin_flag))
+	try:
+		cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+		cursor.execute('UPDATE user SET last_seen = NOW() WHERE id = %s', (session['id'],))
+		mysql.connection.commit()
+	except MySQLdb.Error:
+		print("ERROR IN CONNECTION", flush=True)
 	if rememberme:
 		rememberme_code = account['rememberme']
 		if not rememberme_code:
 			str_to_hash = account["username"] + account["password"]
-			rememberme_code = hash_secret(str_to_hash, app.secret_key)
+			rememberme_code = hash_generate(str_to_hash, app.secret_key)
 		expire_date = datetime.datetime.now() + datetime.timedelta(days=90)
 		resp.set_cookie('rememberme', rememberme_code, expires=expire_date)
 		cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -190,15 +196,14 @@ def login():
 			return 'Use Azure ('+_AZURE_EMAIL_DOMAIN+') login instead'
 		password = request.form['password']
 		token = request.form['token']
-		# Retrieve the hashed password
-		password = hash_secret(password, app.secret_key)
 		# Check if account exists using MySQL
 		cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-		cursor.execute('SELECT * FROM user WHERE username = %s AND password = %s', (username, password,))
+		cursor.execute('SELECT * FROM user WHERE username = %s', (username,))
 		# Fetch one record and return result
 		account = cursor.fetchone()
-		# If account exists in accounts table in out database
-		if account:
+		password_correct = hash_verify(account['password'], password, app.secret_key)
+		# If account exists in accounts table
+		if account and password_correct:
 			# Check if account is activated
 			if settings['account_activation']['value'] != _ACCOUNT_ACTIVATION_NOT_REQUIRED:
 				if settings['account_activation']['value'] == _ACCOUNT_ACTIVATION_AUTOMATED and account['activation_code'] != _ACCOUNT_STATUS_ACTIVATED:
@@ -271,7 +276,7 @@ def register():
 		if not flag:
 			return msg
 		role = 'Member'
-		hashed_password = hash_secret(password, app.secret_key)
+		hashed_password = hash_generate(password, app.secret_key)
 		cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)	
 		if settings['account_activation']['value'] != _ACCOUNT_ACTIVATION_NOT_REQUIRED and not _MAIL_DISABLE_FOR_RUN_LOCAL:
 			# Account activation enabled
@@ -377,7 +382,7 @@ def edit_profile():
 			email = request.form['email']
 			flag, msg = validate_profile_info(username, password, cpassword, email, account["id"])
 			if flag:
-				current_password =  hash_secret(password, app.secret_key) if password else account['password']
+				current_password =  hash_generate(password, app.secret_key) if password else account['password']
 				# update account with the new details
 				cursor.execute('UPDATE user SET username = %s, password = %s, email = %s WHERE id = %s', (username, current_password, email, session['id'],))
 				mysql.connection.commit()
@@ -466,7 +471,7 @@ def resetpassword(email, code):
 			# Password fields must match
 			if npassword and npassword == cpassword and npassword != "":
 				# Hash new password
-				npassword = hash_secret(npassword, app.secret_key)
+				npassword = hash_generate(npassword, app.secret_key)
 				# Update the user's password
 				cursor.execute('UPDATE user SET password = %s, reset = "" WHERE email = %s', (npassword, email,))
 				mysql.connection.commit()
@@ -802,7 +807,7 @@ def admin_account(id):
 			password = account['password']
 			# If password exists in POST request
 			if request.form['password']:
-				password = hash_secret(request.form['password'], app.secret_key)
+				password = hash_generate(request.form['password'], app.secret_key)
 			# Update account details
 			cursor.execute('UPDATE user SET username = %s, password = %s, email = %s, activation_code = %s, rememberme = %s, role = %s, registered = %s, last_seen = %s WHERE id = %s', (request.form['username'],password,request.form['email'],request.form['activation_code'],request.form['rememberme'],request.form['role'],request.form['registered'],request.form['last_seen'],id,))
 			mysql.connection.commit()
@@ -813,7 +818,7 @@ def admin_account(id):
 			return redirect(url_for('authentication.admin_delete_account', id=id))
 	if request.method == 'POST' and request.form['submit']:
         # Create new account, hash password
-		password = hash_secret(request.form['password'], app.secret_key)
+		password = hash_generate(request.form['password'], app.secret_key)
 		# Insert account into database
 		cursor.execute('INSERT INTO user (username,password,email,activation_code,rememberme,role,registered,last_seen) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)', (request.form['username'],password,request.form['email'],request.form['activation_code'],request.form['rememberme'],request.form['role'],request.form['registered'],request.form['last_seen'],))
 		mysql.connection.commit()

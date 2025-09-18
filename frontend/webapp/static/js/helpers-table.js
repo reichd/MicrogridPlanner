@@ -94,7 +94,6 @@ function saveAs(uri, filename) {
         // Remove the link from the document
         document.body.removeChild(link);
 
-        console.log("Download started: " + filename);
       } else {
         console.error("Failed to fetch file: " + xhr.statusText);
       }
@@ -127,12 +126,18 @@ function exportTable(elId, filename) {
 // Takes a results array from the API response and maps it out in a table
 async function mapResultsData(results, pageName) {
   // Add href tags around items that need links, returns array of promises
+
   const resultsWithLinks = results.map(async (r) => {
     const id = r.id;
-    const resultLink =
-      ["simulate"].indexOf(pageName) !== -1
-        ? `/tools/${pageName}/compute/?id=${id}`
-        : `/tools/${pageName}/results/${id}`;
+    const linkPartial = r.method ? `${pageName}/${r.method}` : pageName
+    const linkCompute = `/tools/${linkPartial}/compute/?id=${id}`;
+    const linkResult = `/tools/${linkPartial}/results/${id}`;
+    let link = linkResult
+
+    if (["simulate"].indexOf(pageName) !== -1 || r.method == "deterministic") {
+      link = linkCompute
+    } 
+
     const locationRes = await postData("locations_get", null, {
       id: r.locationId,
     });
@@ -141,14 +146,14 @@ async function mapResultsData(results, pageName) {
     const role = $("#role").text();
     let mappedResult = {
       "Result ID":
-        r.success === null ? r.id : `<a href="${resultLink}">${r.id}</a>`,
+        r.success === null ? r.id : `<a href="${link}">${r.id}</a>`,
       Microgrid: r.gridName,
       "Energy Management System": r.energyManagementSystemName,
       Powerload: r.powerloadName,
       Location: `${locationRes.data.name}, ${locationRes.data.region}, ${locationRes.data.country}`,
       "Simulation Start": r.startdatetime,
       "Simulation End": r.enddatetime,
-      Completed: formatResultsStatus(r.success),
+      Completed: formatResultsStatus(r.success, r.computeJobId),
     };
 
     if (role !== "Guest") {
@@ -159,10 +164,13 @@ async function mapResultsData(results, pageName) {
     }
 
     if (pageName === "resilience") {
-      mappedResult["Disturbance"] = r.name;
-      mappedResult["Disturbance Start"] = r.disturbanceDatetime;
-      mappedResult["Repair"] = "TBD";
+      mappedResult["Disturbance"] = r.disturbanceName;
+      mappedResult["Disturbance Start"] = r.disturbanceStartdatetime;
+      mappedResult["Repair"] = r.repairName;
+      mappedResult["# Shift Hours"] = r.numShiftHours
       mappedResult["Extend Timeframe (proportion)"] = r.extendTimeframe;
+      mappedResult["# Runs"] = r.numRuns;
+      mappedResult["Method"] = r.method;
     }
 
     // For debugging purposes

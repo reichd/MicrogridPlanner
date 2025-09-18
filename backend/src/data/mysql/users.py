@@ -6,6 +6,7 @@ def has_permissions(user_id, table_id, table_name, action, admin=False):
     from the table (and child tables) specified by the input table_name"""
     if admin: return True
     if table_name == None: return True
+    if table_id == -1: return True
     try:
         role = mysql_authentication.DB.query(
                 """SELECT role 
