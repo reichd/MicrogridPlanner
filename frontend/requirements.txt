@@ -8,3 +8,4 @@ requests==2.28.2
 Werkzeug==2.2.2
 mysqlclient==2.2.4
 argon2-cffi>=21.3.0
+cryptography==46.0.4

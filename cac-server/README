@@ -1,0 +1,18 @@
+# Optional Common Access Card (CAC) Authentication Server for Microgrid Planner
+
+# File organization
+
+├── cac-server/
+│   ├── Dockerfile.template                 <- Dockerfile template for the CAC server, adjust as needed
+│   ├── default.conf.template               <- NGINX configuration file template, adjust as needed
+│   └── certs
+│       ├── server.crt                      <- Valid certs
+│       ├── server.key                      <- Valid certs
+│       └── dod-ca-bundle.pem               <- Configuration files from https://www.cyber.mil/pki-pke/tools-configuration-files
+
+## CAC Server Setup Instructions
+
+1. Generate `server.crt` and `server.key` certificates (or equivalent .pem files)
+1. Copy templates to actual files and update files referenced as needed:
+   - `cp cac-server/Dockerfile.template cac-server/Dockerfile`
+   - `cp cac-server/default.conf.template cac-server/default.conf`

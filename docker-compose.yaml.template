@@ -1,4 +1,3 @@
-version: '3'
 services:
   api:
     build:
@@ -21,7 +20,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "8005:8005"
     depends_on:
       database:
         condition: service_healthy
@@ -31,6 +30,22 @@ services:
       - "./database-authentication.env:/app/database-authentication.env:z"
       - "./frontend/config.ini:/app/frontend/config.ini:z"
       - "./config.ini:/app/config.ini:z"
+  nginx:
+    build:
+      context: ./cac-server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      - frontend
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+    volumes:
+      - ./cac-server/certs/server.crt:/etc/nginx/certs/server.crt:ro
+      - ./cac-server/certs/server.key:/etc/nginx/certs/server.key:ro
+      - ./cac-server/certs/dod-ca-bundle.pem:/etc/nginx/certs/dod-ca-bundle.pem:ro
+      - ./cac-server/default.conf:/etc/nginx/conf.d/default.conf
   database:
     image: mysql:8.0
     container_name: mysql

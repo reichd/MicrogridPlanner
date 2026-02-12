@@ -63,7 +63,12 @@ a {
   margin-bottom: 30px;
 }
 
-#oauth-login-azure_activedirectory_v2 {
+.sign-in-options span.no-image {
+  display: block;
+  margin-bottom: 20px;
+}
+
+.sign-in-options button {
   border: 0px;
   padding: 10px;
   border: 1px solid #cccccc;
@@ -71,11 +76,17 @@ a {
   margin-bottom: 70px;
 }
 
-#oauth-login-azure_activedirectory_v2 img {
+.sign-in-options button img {
   margin-right: 10px;
+  width: 150px;
+  display: block;
 }
 
-#oauth-login-azure_activedirectory_v2:hover {
+.sign-in-options button span {
+  margin-top: 10px;
+}
+
+.sign-in-options button:hover {
   background-color: #f7f7f7;
   border: 1px solid #d9d9d9;
 }

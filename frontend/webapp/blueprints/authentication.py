@@ -1,15 +1,23 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, make_response, flash
+from importlib import metadata
+from flask import Blueprint, render_template, request, redirect, url_for, session, make_response, flash, jsonify
 from flask import current_app as app
 from flask_mail import Message
 from extensions import mail, mysql, clear_session_data, display_user, json_web_token, hash_generate, hash_verify
-import MySQLdb.cursors, re, uuid, datetime, os, math, urllib, json
+import MySQLdb.cursors, re, uuid, datetime, os, math, urllib, json, hashlib
 import configparser
 import requests
 import secrets
 import jwt
+from cryptography import x509
+from cryptography.x509.oid import ExtensionOID, NameOID, ObjectIdentifier
+from typing import Optional, Tuple, Dict, Any
+
 
 _CONFIG_INI = configparser.ConfigParser()
 _CONFIG_INI.read("config.ini")
+_CONSENT_BANNER = _CONFIG_INI.getboolean("CUI","CONSENT_BANNER",fallback=False)
+_USERNAME_LOGIN_DISABLE = _CONFIG_INI.getboolean("USERNAME_LOGIN", "DISABLE", fallback=False)
+_CAC_LOGIN_ENABLE = _CONFIG_INI.getboolean("CAC_LOGIN", "ENABLE", fallback=False)
 _AZURE = dict(_CONFIG_INI.items("AZURE")) if _CONFIG_INI.has_section("AZURE") else dict()
 _AZURE_CLIENT_ID = _AZURE["client_id"] if "client_id" in _AZURE else None
 _AZURE_TENANT_ID = _AZURE["tenant_id"] if "tenant_id" in _AZURE else None
@@ -27,6 +35,10 @@ _ACCOUNT_STATUS_CONFIRMED = "confirmed"
 _ACCOUNT_STATUS_ACTIVATED = "activated"
 
 authentication_blueprint = Blueprint('authentication', __name__)
+
+def include_consent_banner():
+	"""Returns boolean indicating whether to include consent banner"""
+	return _CONSENT_BANNER
 
 def use_azure():
 	"""Returns boolean indicating whether Azure requirements have been specified"""
@@ -167,10 +179,276 @@ def azure():
 		headers=dict(Authorization="Bearer {0}".format(token)),
 	).json()
 	email = response_user["mail"]
+	if not email:
+		email = response_user["userPrincipalName"]
 	account = azure_account_register(email)
 	response = create_session_data(account, respond_success=False)
 	return response
 
+def activate_account(email, username=None, password=None, role=None, user_key=None):
+	# Generate a random unique id for activation code
+	activation_code = uuid.uuid4()
+	# Insert account into database
+	cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+	if user_key:
+		cursor.execute('SELECT * FROM user WHERE cacid = %s', (user_key,))
+		account = cursor.fetchone()
+		if account:
+			return 'Your CAC has already been linked to an account. Please login instead.'
+	if username and password and role:
+		cursor.execute('INSERT INTO user (username, password, email, activation_code, role, ip) VALUES (%s, %s, %s, %s, %s, %s)', (username, password, email, activation_code, role, request.environ['REMOTE_ADDR'],))
+	if user_key:
+		cursor.execute('UPDATE user SET cacid = %s, activation_code = %s WHERE email = %s', (user_key, activation_code, email,))
+	mysql.connection.commit()
+	# Create new message
+	email_info = Message('Account Activation Required', sender = app.config['MAIL_USERNAME'], recipients = [email])
+	# Activate Link URL
+	activate_link = _APP_URL + url_for('authentication.activate', email=email, code=str(activation_code))
+	# Define and render the activation email template
+	email_info.body = render_template('authentication-codeshack/activation-email-template.html', link=activate_link)
+	email_info.html = render_template('authentication-codeshack/activation-email-template.html', link=activate_link)
+	# send activation email to user
+	if not _MAIL_DISABLE_FOR_RUN_LOCAL:
+		mail.send(email_info)
+	# Output message
+	return 'Please check your email to activate your account!'
+
+# Common regexes for CAC EDIPI and UPN extraction
+EDIPI_10_RE = re.compile(r"\b(\d{10})\b")
+UPN_LIKE_RE = re.compile(r"\b(\d{10,16})@(?:mil|smil)\b", re.IGNORECASE)  # sometimes 16-digit PIV-style IDs show up
+
+# Windows UPN OtherName OID often used in cert SAN
+# (UPN is commonly stored as OtherName with OID 1.3.6.1.4.1.311.20.2.3)
+UPN_OTHERNAME_OID = ObjectIdentifier("1.3.6.1.4.1.311.20.2.3")
+
+
+def _load_cert_from_nginx_header(cert_header: str) -> x509.Certificate:
+    """
+    cert_header: URL-escaped PEM from NGINX ($ssl_client_escaped_cert)
+    """
+    pem_text = urllib.parse.unquote(cert_header).strip()
+    return x509.load_pem_x509_certificate(pem_text.encode("utf-8"))
+
+
+def _extract_edipi_from_subject_dn(cert: x509.Certificate) -> Optional[str]:
+    # Try CN first (many environments put EDIPI there, e.g. LAST.FIRST.MI.1234567890) [4](https://public.cyber.mil/)
+    try:
+        cn_attrs = cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        if cn_attrs:
+            cn = cn_attrs[0].value
+            m = EDIPI_10_RE.search(cn)
+            if m:
+                return m.group(1)
+    except Exception:
+        pass
+
+    # Try anywhere in the full subject DN string as a fallback
+    subj = cert.subject.rfc4514_string()
+    m = EDIPI_10_RE.search(subj)
+    return m.group(1) if m else None
+
+
+def _extract_edipi_from_san(cert: x509.Certificate) -> Optional[str]:
+    """
+    Try to find EDIPI (10-digit) from SAN:
+    - rfc822Name emails (sometimes EDIPI@mil appears as UPN-ish)
+    - otherName UPN PrincipalName (OID 1.3.6.1.4.1.311.20.2.3) [2](https://stackoverflow.com/questions/79588699/how-to-configure-nginx-to-prompt-the-user-to-select-a-client-certificate-from-os)
+    """
+    try:
+        san = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME).value
+    except x509.ExtensionNotFound:
+        return None
+
+    # 1) rfc822Name values (emails). Sometimes you’ll see EDIPI@mil instead of a real email. [2](https://stackoverflow.com/questions/79588699/how-to-configure-nginx-to-prompt-the-user-to-select-a-client-certificate-from-os)
+    try:
+        emails = san.get_values_for_type(x509.RFC822Name)
+        for e in emails:
+            m = UPN_LIKE_RE.search(e)
+            if m and len(m.group(1)) == 10:
+                return m.group(1)
+    except Exception:
+        pass
+
+    # 2) otherName values (UPN PrincipalName is commonly stored here on CAC/PIV in some environments) [2](https://stackoverflow.com/questions/79588699/how-to-configure-nginx-to-prompt-the-user-to-select-a-client-certificate-from-os)
+    for on in san.get_values_for_type(x509.OtherName):
+        if on.type_id == UPN_OTHERNAME_OID:
+            # otherName.value is ASN.1 encoded; often decodes to a UTF8/IA5 string payload.
+            raw = on.value
+            # Best-effort decode:
+            text = None
+            for enc in ("utf-8", "utf-16le", "latin1"):
+                try:
+                    text = raw.decode(enc, errors="ignore")
+                    break
+                except Exception:
+                    continue
+            if not text:
+                continue
+            m = UPN_LIKE_RE.search(text)
+            if m and len(m.group(1)) == 10:
+                return m.group(1)
+
+    return None
+
+def _subject_key_identifier_hex(cert: x509.Certificate) -> Optional[str]:
+    """
+    SKI is a good “strong mapping” fallback if present; stable as long as the key remains the same.
+    """
+    try:
+        ski = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER).value
+        return ski.digest.hex()
+    except x509.ExtensionNotFound:
+        return None
+
+def _public_key_spki_sha256(cert: x509.Certificate) -> str:
+    """
+    Hash the SubjectPublicKeyInfo bytes. This is stable for the same public key.
+    """
+    spki = cert.public_key().public_bytes(
+        encoding=__import__("cryptography.hazmat.primitives.serialization").hazmat.primitives.serialization.Encoding.DER,
+        format=__import__("cryptography.hazmat.primitives.serialization").hazmat.primitives.serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    return hashlib.sha256(spki).hexdigest()
+
+def _cert_fingerprint_sha256(cert: x509.Certificate) -> str:
+    return cert.fingerprint(hashlib.sha256()).hex()
+
+def derive_cac_user_key_from_nginx(
+    cert_header: str,
+    *,
+    prefer_person_id: bool = True
+) -> Tuple[str, Dict[str, Any]]:
+    """
+    Returns:
+      (stable_id, metadata)
+
+    stable_id format examples:
+      - "edipi:1234567890"      (best: stable person identifier)
+      - "ski:<hex>"             (stable as long as key stays same)
+      - "spki-sha256:<hex>"     (stable as long as key stays same)
+      - "cert-sha256:<hex>"     (stable for this cert; changes on renewal)
+      - "issuer-serial:<...>"   (stable for this cert; changes on renewal)
+
+    NOTE: Only EDIPI is a true person-stable identifier in typical DoD usage. [1](https://public.cyber.mil/get-dod-certs/)[2](https://stackoverflow.com/questions/79588699/how-to-configure-nginx-to-prompt-the-user-to-select-a-client-certificate-from-os)
+    """
+    cert = _load_cert_from_nginx_header(cert_header)
+
+    meta: Dict[str, Any] = {
+        "subject": cert.subject.rfc4514_string(),
+        "issuer": cert.issuer.rfc4514_string(),
+        "serial": hex(cert.serial_number),
+    }
+
+    # --- Tier 1: EDIPI (person-stable when present) ---
+    if prefer_person_id:
+        edipi = _extract_edipi_from_san(cert) or _extract_edipi_from_subject_dn(cert)
+        if edipi:
+            meta["method"] = "edipi"
+            return f"edipi:{edipi}", meta
+
+    # --- Tier 2: Subject Key Identifier (strong key-based mapping) ---
+    ski_hex = _subject_key_identifier_hex(cert)
+    if ski_hex:
+        meta["method"] = "ski"
+        return f"ski:{ski_hex}", meta
+
+    # --- Tier 3: Public key hash (strong key-based mapping) ---
+    spki_hash = _public_key_spki_sha256(cert)
+    meta["method"] = "spki-sha256"
+    return f"spki-sha256:{spki_hash}", meta
+
+    # If you want “always something even if public_key fails” you can extend with:
+    # fp = _cert_fingerprint_sha256(cert)
+    # return f"cert-sha256:{fp}", {...}
+
+def check_account_activation(account):
+	# Check if account is activated
+	settings = get_settings()
+	msg = None
+	if settings['account_activation']['value'] != _ACCOUNT_ACTIVATION_NOT_REQUIRED:
+		if settings['account_activation']['value'] == _ACCOUNT_ACTIVATION_AUTOMATED and account['activation_code'] != _ACCOUNT_STATUS_ACTIVATED:
+			msg = 'Please activate your account to login!'
+		if settings['account_activation']['value'] == _ACCOUNT_ACTIVATION_MANUAL:
+			if account['activation_code'] == _ACCOUNT_STATUS_CONFIRMED:
+				msg = 'Your account is pending approval. You may email the system admin at {0} for a status update'.format(app.config["MAIL_REPLY_TO"])
+			elif account['activation_code'] != _ACCOUNT_STATUS_ACTIVATED:
+				msg = 'Please activate your account to login!'
+	return msg
+
+@authentication_blueprint.route("/cac", methods=["GET", "POST"])
+def cac():
+	# If already logged in or "remember me", follow your existing flows
+	if loggedin():
+		return redirect(url_for('toplevel.home'))
+	elif rememberme():
+		return redirect(url_for('authentication.login'))
+
+	# --- 1) Verify CAC/Client certificate ---
+	verify = request.headers.get("X-SSL-Client-Verify")
+	if verify != "SUCCESS":
+		msg = "Client certificate verification failed. Please ensure you have a valid CAC and try again."
+		return redirect(url_for('authentication.login', msg=msg))
+
+	client_cert = request.headers.get("X-SSL-Client-Cert")
+
+	# Derive your CAC key (e.g., EDIPI) and metadata
+	user_key, meta = derive_cac_user_key_from_nginx(client_cert)
+	if not user_key:
+		msg = "Could not derive CAC identity. Please reinsert your CAC and try again."
+		return redirect(url_for('authentication.login', msg=msg))
+
+	# DB handle
+	cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+	# --- 2) If GET: attempt login if account exists; otherwise show registration form ---
+	if request.method == "GET":
+		account = None
+		cursor.execute('SELECT * FROM user WHERE cacid = %s', (user_key,))
+		account = cursor.fetchone()
+
+		if account:
+			activation_status = check_account_activation(account)
+			if activation_status:
+				# e.g., "Your account is not activated yet" or similar
+				return redirect(url_for('authentication.login', msg=activation_status))
+			# Create session and return your existing response object
+			return create_session_data(account, respond_success=False)
+
+		# Account not found: render registration form
+		return render_template(
+			'authentication-codeshack/cac.html',
+			msg='',
+			settings=get_settings(),
+		)
+
+	# --- 3) If POST: treat as registration submission ---
+	if not _CAC_LOGIN_ENABLE:
+		return 'CAC login is disabled. Please use Azure or username login.'
+
+	if 'email' not in request.form:
+		return 'Email is required.'
+
+	# Basic email validation
+	email = request.form['email'].strip()
+	if not re.match(r'[^@]+@[^@]+\.[^@]+', email):
+		return 'Invalid email address'
+
+	# Check if email is already associated with an account
+	cursor.execute('SELECT * FROM user WHERE email = %s', (email,))
+	existing = cursor.fetchone()
+
+	if existing:
+		# Link CAC to existing account via your existing activation helper
+		return activate_account(email=email, user_key=user_key)
+
+	# Create a new account and activate (or send activation) using your helper
+	return activate_account(
+		email=email,
+		username=email,
+		password=hash_generate(secrets.token_urlsafe(20), app.secret_key),
+		role="Member",
+		user_key=user_key
+	)
 
 # http://localhost:5000/accounts/ - this will be the login page, we need to use both GET and POST requests
 @authentication_blueprint.route('/', methods=['GET', 'POST'])
@@ -179,7 +457,9 @@ def login():
 	if loggedin():
 		return redirect(url_for('toplevel.home'))
 	# Output message if something goes wrong...
-	msg = ''
+	if request.method == 'POST' and _USERNAME_LOGIN_DISABLE:
+		return 'Username/password login is disabled. Please use Azure or CAC login.'
+	msg = request.args.get('msg') if request.args.get('msg') else ''
 	# Retrieve the settings
 	settings = get_settings()
 	# Check if "username" and "password" POST requests exist (user submitted form)
@@ -201,18 +481,12 @@ def login():
 		cursor.execute('SELECT * FROM user WHERE username = %s', (username,))
 		# Fetch one record and return result
 		account = cursor.fetchone()
-		password_correct = hash_verify(account['password'], password, app.secret_key)
+		password_correct = hash_verify(account['password'], password, app.secret_key) if account else False
 		# If account exists in accounts table
 		if account and password_correct:
-			# Check if account is activated
-			if settings['account_activation']['value'] != _ACCOUNT_ACTIVATION_NOT_REQUIRED:
-				if settings['account_activation']['value'] == _ACCOUNT_ACTIVATION_AUTOMATED and account['activation_code'] != _ACCOUNT_STATUS_ACTIVATED:
-					return 'Please activate your account to login!'
-				if settings['account_activation']['value'] == _ACCOUNT_ACTIVATION_MANUAL:
-					if account['activation_code'] == _ACCOUNT_STATUS_CONFIRMED:
-						return 'Your account is pending approval. You may email the system admin at {0} for a status update'.format(app.config["MAIL_REPLY_TO"])
-					if account['activation_code'] != _ACCOUNT_STATUS_ACTIVATED:
-						return 'Please activate your account to login!'
+			activation_status = check_account_activation(account)
+			if activation_status:
+				return activation_status
 			# CSRF protection, form token should match the session token
 			if settings['csrf_protection']['value'] == 'true' and str(token) != str(session['token']):
 				return 'Invalid token!'
@@ -242,8 +516,8 @@ def login():
 	session['token'] = token
 	# Show the login form with message (if any)
 	return render_template('authentication-codeshack/login.html', msg=msg, token=token, settings=settings, 
-			azure=use_azure(), azure_url=azure_url("/authorize"), azure_url_params=azure_url_params())
-
+			azure=use_azure(), azure_url=azure_url("/authorize"), azure_url_params=azure_url_params(),
+			include_consent_banner=include_consent_banner())
 
 # http://localhost:5000/pythinlogin/register - this will be the registration page, we need to use both GET and POST requests
 @authentication_blueprint.route('/register', methods=['GET', 'POST'])
@@ -259,13 +533,19 @@ def register():
 	settings = get_settings()
 	# Check if "username", "password", "cpassword" and "email" POST requests exist (user submitted form)
 	if request.method == 'POST' and 'username' in request.form and 'password' in request.form and 'cpassword' in request.form and 'email' in request.form:
-		# reCAPTCHA
-		if settings['recaptcha']['value'] == 'true':
+		# reCAPTCHA validation
+		if settings.get('recaptcha', {}).get('value') == 'true':
 			if 'g-recaptcha-response' not in request.form:
 				return 'Invalid captcha!'
-			req = urllib.request.Request('https://www.google.com/recaptcha/api/siteverify', urllib.parse.urlencode({ 'response': request.form['g-recaptcha-response'], 'secret': settings['recaptcha_secret_key']['value'] }).encode())	
+			req = urllib.request.Request(
+				'https://www.google.com/recaptcha/api/siteverify',
+				urllib.parse.urlencode({
+					'response': request.form['g-recaptcha-response'],
+					'secret': settings['recaptcha_secret_key']['value']
+				}).encode()
+			)
 			response_json = json.loads(urllib.request.urlopen(req).read().decode())
-			if not response_json['success']:
+			if not response_json.get('success'):
 				return 'Invalid captcha!'
 		# Create variables for easy access
 		username = request.form['username']
@@ -279,26 +559,11 @@ def register():
 		hashed_password = hash_generate(password, app.secret_key)
 		cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)	
 		if settings['account_activation']['value'] != _ACCOUNT_ACTIVATION_NOT_REQUIRED and not _MAIL_DISABLE_FOR_RUN_LOCAL:
-			# Account activation enabled
-			# Generate a random unique id for activation code
-			activation_code = uuid.uuid4()
-			# Insert account into database
-			cursor.execute('INSERT INTO user (username, password, email, activation_code, role, ip) VALUES (%s, %s, %s, %s, %s, %s)', (username, hashed_password, email, activation_code, role, request.environ['REMOTE_ADDR'],))
-			mysql.connection.commit()
-			# Create new message
-			email_info = Message('Account Activation Required', sender = app.config['MAIL_USERNAME'], recipients = [email])
-			# Activate Link URL
-			activate_link = _APP_URL + url_for('authentication.activate', email=email, code=str(activation_code))
-			# Define and render the activation email template
-			email_info.body = render_template('authentication-codeshack/activation-email-template.html', link=activate_link)
-			email_info.html = render_template('authentication-codeshack/activation-email-template.html', link=activate_link)
-			# send activation email to user
-			mail.send(email_info)
-			# Output message
-			return 'Please check your email to activate your account!'
+			return activate_account(email, username=username, password=hashed_password, role=role)
 		else:
 			# Account doesnt exists and the form data is valid, now insert new account into accounts table
 			activation_status = _ACCOUNT_STATUS_ACTIVATED
+			cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 			cursor.execute('INSERT INTO user (username, password, email, activation_code, role, ip) VALUES (%s, %s, %s,%s, %s, %s)', (username, hashed_password, email, activation_status, role, request.environ['REMOTE_ADDR'],))
 			mysql.connection.commit()
 			# Auto login if the setting is enabled

@@ -1,3 +1,4 @@
+{% if not username_login_disable %}
 <!DOCTYPE html>
 <html>
 	<head>
@@ -55,5 +56,7 @@
 		</div>
 
 		<script src="{{ url_for('static', filename='authentication-codeshack/script.js') }}"></script>
+
 	</body>
 </html>
+{% endif %}

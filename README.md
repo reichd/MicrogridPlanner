@@ -11,11 +11,12 @@ The goal of this software is to deploy analytical methods for microgrid planning
 ## File Organization
 
     ├── backend                                 <- Backend application (see README in backend for more info)
-    ├── frontend                                <- Frontend application (see README in fronted for more info)
-    ├── config.ini.template                     <- Global config file template for shared settings between backend and frontend (copy to config.ini and update parameter values)
-    ├── database-authentication.env.template    <- MySQL configuration file template for authentication database (copy to database-authentication.env and update parameter values)
-    ├── docker-compose.yaml.template            <- Configuration file for Docker multi-container application services (copy to docker-compose.yaml)
-    ├── generate_secret_key.py                  <- Script to generate a secret key for config.ini
+    ├── cac-server                              <- Optional server for Common Access Card (CAC) authentication (see README in `cac-server` for more info)
+    ├── frontend                                <- Frontend application (see README in frontend for more info)
+    ├── config.ini.template                     <- Global config file template for shared settings between backend and frontend (copy to `config.ini` and update parameter values)
+    ├── database-authentication.env.template    <- MySQL configuration file template for authentication database (copy to `database-authentication.env` and update parameter values)
+    ├── docker-compose.yaml.template            <- Configuration file for Docker multi-container application services (copy to `docker-compose.yaml`)
+    ├── generate_secret_key.py                  <- Script to generate a secret key for `config.ini`
     ├── LICENSE                                 <- License terms
     └── README                                  <- Documentation
 
@@ -63,6 +64,7 @@ The goal of this software is to deploy analytical methods for microgrid planning
         - Run `mysqld --initialize-insecure` to initialize the data. This will create a data folder under `/mysql8install`. Running it as insecure will enable running the database without a password.
         - In the same directory, run `mysqld --console` to start the MySQL server. Leave this terminal window open. Closing it will stop the server. 
         - For troubleshooting, read the [MySQL documentation for installing via archive](https://dev.mysql.com/doc/mysql-installation-excerpt/5.7/en/windows-install-archive.html).
+3. Review `README` files in `frontend`, `cac-server` and `backend` folders and follow instructions.
 
 
 ## Instructions to Run Locally or Deploy via Docker
@@ -76,7 +78,7 @@ The goal of this software is to deploy analytical methods for microgrid planning
         - `MYSQL_USER`, `MYSQL_PASSWORD` and `MYSQL_DATABASE` can be set to any values
         - `MYSQL_PORT` should be set to `3306`
         - `MYSQL_HOST` should be set to `127.0.0.1` or `localhost` or when running Docker to `mysql`
-2. Review `README` files in both `frontend` and `backend` folders and follow instructions.
+2. Review `README` files in `frontend`, `cac-server` and `backend` folders and follow instructions.
 
 
 ## Instructions to Deploy via Docker

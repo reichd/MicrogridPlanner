@@ -5,6 +5,9 @@
 		<meta name="viewport" content="width=device-width,minimum-scale=1">
 		<title>{% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    {% if include_cui %}
+      <link rel="stylesheet" href="{{ url_for('static', filename='css/cui.css') }}">
+    {% endif %}
 		<link rel="stylesheet" href="{{ url_for('static', filename='authentication-codeshack/style.css') }}">
 		<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.1/css/all.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet" />
@@ -15,69 +18,77 @@
     {% block head %}{% endblock %}
 	</head>
 	<body class="loggedin d-flex flex-column h-100 {% if role == 'Guest' %}guest{% endif %}" >
-    <div id="role" style="display: none;">{{ role }}</div>
-    <nav class="navtop">
-			<div class="container">
-        <div class="app-logo-title-container">
-          <a href="{{ url_for('toplevel.home') }}">
-            <img class="app-logo" src="{{ url_for('static', filename='images/WindTurbine.png') }}"/>
-            <h1>Microgrid Planner</h1>
-          </a>
-        </div>
-        
-        <button id="mobile-nav-btn" class="btn" onclick="toggleMobileNavMenu(this, event)">
-          <i class="bi bi-list"></i>
-        </button>
-
-        <div id="navtop-links-container">
-          <a href="{{ url_for('tools.home') }}"><i class="fas fa-lightbulb"></i>Tools</a>
-          <a href="https://github.com/reichd/MicrogridPlanner" target="_blank"><i class="fas fa-code"></i>Code</a>          
-          <a href="{{ url_for('authentication.profile') }}"><i class="fas fa-user-circle"></i>
-            {{ username if username else 'guest'}}</a>
-          {% if role == 'Admin' %}
-            <a href="{{ url_for('authentication.admin') }}"><i class="fas fa-cog"></i>Admin</a>
-          {% endif %}
-          {% if not username or (username == 'guest' and role != 'Admin') %}
-            <a href="{{ url_for('authentication.login') }}"><i class="fas fa-sign-out-alt"></i>Login</a>
-          {% else %}
-            <a href="{{ url_for('authentication.logout') }}"><i class="fas fa-sign-out-alt"></i>Logout</a>
-          {% endif %}
-        </div>
-			</div>
-		</nav>
-
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        {% for message in messages %}
-          <div class="alert alert-primary alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    {% if include_cui %}
+      <div class="cui-banner cui-banner--top" role="note" aria-label="Controlled Unclassified Information banner">CUI</div>
+    {% endif %}
+    <main id="app-content">
+      <div id="role" style="display: none;">{{ role }}</div>
+      <nav class="navtop">
+        <div class="container">
+          <div class="app-logo-title-container">
+            <a href="{{ url_for('toplevel.home') }}">
+              <img class="app-logo" src="{{ url_for('static', filename='images/WindTurbine.png') }}"/>
+              <h1>Microgrid Planner</h1>
+            </a>
           </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
-		
-		{% block content %}{% endblock %}
-    
-    <div class="toast-container">
-      <div id="global-toast" class="toast hide bg-success text-white" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="toast-body">
-          <i class="bi bi-check-circle-fill"></i>
-          <span class="toast-text"></span>
-        </div>
-      </div>
-    </div>
+          
+          <button id="mobile-nav-btn" class="btn" onclick="toggleMobileNavMenu(this, event)">
+            <i class="bi bi-list"></i>
+          </button>
 
-    <footer class="footer mt-auto py-3 bg-light">
-      <div class="container">
-        <img class="nps-logo" src="{{ url_for('static', filename='images/nps_logo.png') }}"/>
-        <div>
-          <span class="text-muted">Site hosted by <a href="https://www.nps.edu" target="_blank">Naval Postgraduate School</a></span>
-          <br/>
-          <span class="text-muted">Contact <a href="mailto:microgridplanner@nps.edu">microgridplanner@nps.edu</a></span>
+          <div id="navtop-links-container">
+            <a href="{{ url_for('tools.home') }}"><i class="fas fa-lightbulb"></i>Tools</a>
+            <a href="https://github.com/reichd/MicrogridPlanner" target="_blank"><i class="fas fa-code"></i>Code</a>          
+            <a href="{{ url_for('authentication.profile') }}"><i class="fas fa-user-circle"></i>
+              {{ username if username else 'guest'}}</a>
+            {% if role == 'Admin' %}
+              <a href="{{ url_for('authentication.admin') }}"><i class="fas fa-cog"></i>Admin</a>
+            {% endif %}
+            {% if not username or (username == 'guest' and role != 'Admin') %}
+              <a href="{{ url_for('authentication.login') }}"><i class="fas fa-sign-out-alt"></i>Login</a>
+            {% else %}
+              <a href="{{ url_for('authentication.logout') }}"><i class="fas fa-sign-out-alt"></i>Logout</a>
+            {% endif %}
+          </div>
+        </div>
+      </nav>
+
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          {% for message in messages %}
+            <div class="alert alert-primary alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      
+      {% block content %}{% endblock %}
+      
+      <div class="toast-container">
+        <div id="global-toast" class="toast hide bg-success text-white" role="alert" aria-live="assertive" aria-atomic="true">
+          <div class="toast-body">
+            <i class="bi bi-check-circle-fill"></i>
+            <span class="toast-text"></span>
+          </div>
         </div>
       </div>
-    </footer>
+
+      <footer class="footer mt-auto py-3 bg-light">
+        <div class="container">
+          <img class="nps-logo" src="{{ url_for('static', filename='images/nps_logo.png') }}"/>
+          <div>
+            <span class="text-muted">Site hosted by <a href="https://www.nps.edu" target="_blank">Naval Postgraduate School</a></span>
+            <br/>
+            <span class="text-muted">Contact <a href="mailto:{{ admin_email }}">{{ admin_email }}</a></span>
+          </div>
+        </div>
+      </footer>
+    </main>
+    {% if include_cui %}
+      <div class="cui-banner cui-banner--bottom" role="note" aria-label="Controlled Unclassified Information footer">CUI</div>
+    {% endif %}
 
     <script>
       // Handles collapsing/expanding main mobile navigation

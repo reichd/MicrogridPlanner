@@ -1,0 +1,38 @@
+server {
+    listen 8443 ssl;
+    server_name localhost;
+
+    # --- cert for this local server ---
+    ssl_certificate     /etc/nginx/certs/server.crt;
+    ssl_certificate_key /etc/nginx/certs/server.key;
+
+    # --- DoD CA bundle to validate CAC certs ---
+    ssl_client_certificate /etc/nginx/certs/dod-ca-bundle.pem;
+
+
+    # --- MOST IMPORTANT SETTING ---
+    # This REQUESTS a CAC but DOES NOT REQUIRE one.
+    ssl_verify_client optional;
+    ssl_verify_depth 5;
+
+    # --- Clear any spoofed headers ---
+    proxy_set_header X-SSL-Client-Verify "";
+    proxy_set_header X-SSL-Client-Subject-DN "";
+    proxy_set_header X-SSL-Client-Issuer-DN "";
+    proxy_set_header X-SSL-Client-Serial "";
+    proxy_set_header X-SSL-Client-Cert "";
+
+    # --- Add CAC-derived info if present ---
+    # (These come from NGINX's SSL module variables, which provide client-certificate details.)
+    # NGINX’s SSL module formalizes variables such as $ssl_client_verify,
+    # $ssl_client_s_dn, and others used for upstream forwarding. [3](https://nginx.org/en/docs/http/ngx_http_ssl_module.html)
+    proxy_set_header X-SSL-Client-Verify     $ssl_client_verify;
+    proxy_set_header X-SSL-Client-Subject-DN $ssl_client_s_dn;
+    proxy_set_header X-SSL-Client-Issuer-DN  $ssl_client_i_dn;
+    proxy_set_header X-SSL-Client-Serial     $ssl_client_serial;
+    proxy_set_header X-SSL-Client-Cert       $ssl_client_escaped_cert;
+
+    location / {
+        proxy_pass http://frontend:8005;   # your Flask app
+    }
+}

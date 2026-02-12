@@ -235,6 +235,13 @@ body.loggedin {
   background-color: #2868c7;
 }
 
+.login .msg, .register .msg {
+  color: red;
+  font-weight: bold;
+  text-align: center;
+  padding-bottom: 10px;
+}
+
 @media screen and (max-width: 400px) {
   .login, .register {
     width: 95%;

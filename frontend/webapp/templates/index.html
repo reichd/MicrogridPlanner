@@ -28,7 +28,7 @@
         height="360" 
         frameborder="0" 
         allow="autoplay; fullscreen; picture-in-picture" 
-        allowfullscreen>
+    >
     </iframe>
   </section>
   
@@ -56,18 +56,21 @@
             <li><a href="https://www.linkedin.com/in/hyatt-moore-iv-382178a/" target="_blank">
                 Hyatt Moore</a>, proof of concept JavaScript and MySQL contributor, 2021-2022</li>
             <li><a href="https://www.linkedin.com/in/bruce-v-chiarelli-64853917/" target="_blank">
-                Bruce Chiarelli</a>, Docker contributor and deployment lead 2021-2023</li>
+                Bruce Chiarelli</a>, Docker contributor and deployment support 2021-2023</li>
             <li><a href="https://www.linkedin.com/in/jeffhaferman/" target="_blank">
                 Jeff Haferman</a>, Naval Postgraduate School High-Performance Computing support, 2023-present</li>
             <li><a href="https://www.linkedin.com/in/philip-mccullick-6529977/" target="_blank">
-                Philip McCullick</a>, Docker contributor and deployment lead 2023-present</li>
+                Philip McCullick</a>, Docker contributor and deployment support 2023-present</li>
             <li>Eldor Magat, deployment support 2024-2025</li>
+            <li><a href="https://www.linkedin.com/in/taylorjconn/" target="_blank">
+                Taylor Conn</a>, frontend contributor, 2024-2025</li>
             <li><a href="https://www.linkedin.com/in/richard-alves/" target="_blank">
                 Richard Alves</a>, photovoltaic and wind modeling contributor, 2024-present</li>
-            <li><a href="https://www.linkedin.com/in/taylorjconn/" target="_blank">
-                Taylor Conn</a>, frontend contributor, 2024-present</li>
+            <li>Captain Dylan Bruns, home page demo video, 2025</li>
             <li><a href="https://www.linkedin.com/in/joseph-martineau/" target="_blank">
                 Joseph Martineau</a>, deployment support 2025-present</li>
+            <li><a href="https://www.linkedin.com/in/craigvershaw/" target="_blank">
+                Craig Vershaw</a>, networking support for CAC authentication 2026-present</li>
         </ul>
         Our front-end authentication code is a modified and extended version of the <a href="https://codeshack.io/package/php/advanced-secure-login-registration-system/" target="_blank">Advanced Secure Login & Registration System</a> developed by <a href="https://codeshack.io/" target="_blank">CodeShack</a>.
     </p>
@@ -75,6 +78,14 @@
 
   <section id="release" class="home">
     <h3>Release Notes</h3>
+    <p class="multiple-paragraphs">
+        Version 3.1 - February 2026
+        <ul>
+            <li>Common Access Card (CAC) authentication</li>
+            <li>Consent banner and labels for Controlled Unclassified Information (CUI)</li>
+            <li>Configuration options for enabling CAC, and deactivating local login with username and password</li>
+        </ul>
+    </p>
     <p class="multiple-paragraphs">
         Version 3.0 - August 2025
         <ul>
@@ -148,5 +159,17 @@
       </ul>
     </p>
   </section>
+
+  {% if include_cui %}
+    <section class="cui-di-block" aria-label="CUI Designation Indicator">
+        <div><strong>Controlled by:</strong>{{ cui_component }} / {{ cui_office }}</div>
+        {% if cui_categories %}
+            <div><strong>CUI Category:</strong> {{ cui_categories }}</div>
+        {% endif %}
+        <div><strong>Limited Dissemination Control:</strong> {{ cui_limited_dissemination }}</div>
+        <div><strong>POC:</strong> {{ admin_email }}</div>
+    </section>
+  {% endif %}
+
 </div>
 {% endblock %}

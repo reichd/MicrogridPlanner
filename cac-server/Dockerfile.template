@@ -1,0 +1,7 @@
+# nginx/Dockerfile
+FROM nginx:1.25-alpine
+
+RUN apk add --no-cache curl
+
+# NGINX expects configs in /etc/nginx/conf.d/
+# We'll bind-mount default.conf from compose.

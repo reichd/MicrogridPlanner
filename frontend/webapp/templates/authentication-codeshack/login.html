@@ -2,13 +2,27 @@
 
 {% block title %}Login{% endblock %}
 
+{% block head %}
+	{% if include_consent_banner %}
+	<link rel="stylesheet" type="text/css" href="/static/authentication-codeshack/consent-cui.css" />
+	<script src="/static/js/authentication/consent-cui.js"></script>
+	{% endif %}
+{% endblock %}
+
 {% block content %}
+{% if include_consent_banner %}
+	{% include 'authentication-codeshack/consent-cui.html' %}
+	<script>showDoDConsentBanner();</script>
+{% endif %}
 
 <div class="login">
+	
+	{% if not username_login_disable %}
 	<div class="links">
 		<a href="{{ url_for('authentication.login') }}" class="active">Login</a>
 		<a href="{{ url_for('authentication.register') }}">Register</a>
 	</div>
+	{% endif %}
 
 	{% if azure %}
 	<div class="sign-in-options">
@@ -16,43 +30,64 @@
 		<div>
 			<form method="post" action="{{ azure_url }}">
 				<button id="oauth-login-azure_activedirectory_v2" type="submit"><img alt="NPS account" title="Sign in with NPS account" src="{{ url_for('static', filename='authentication-codeshack/azure-logo.png') }}" loading="lazy" data-qa_selector="js_lazy_loaded_content">
-          <span>NPS account</span>
+          			<span>NPS account</span>
 				</button>
 				{% for key, value in azure_url_params.items() %}
 					<input type="hidden" name={{ key }} value={{ value }} />
 				{% endfor %}
 			</form>
 		</div>
-		<span>Or sign in with a registered account</span>
 	</div>
 	{% endif %}
 
-	<form class="ajax-form" action="" method="post">
-
-		<label for="username">
-			<i class="fas fa-user"></i>
-		</label>
-		<input type="text" name="username" placeholder="Username" id="username" autocomplete="username" required>
-
-		<label for="password">
-			<i class="fas fa-lock"></i>
-		</label>
-		<input type="password" name="password" placeholder="Password" id="password" required>
-
-		<!-- <label id="rememberme">
-			<input type="checkbox" name="rememberme">Remember me
-		</label> -->
-		<a href="{{ url_for('authentication.forgotpassword') }}">Forgot Password?</a>
-
-		<input type="hidden" name="token" value="{{ token }}">
-
-		<div class="msg">{{ msg }}</div>
-
-		<input type="submit" value="Login">
-
-	</form>
-
+	{% if cac_login_enable %}
+	<div class="sign-in-options">
+		<span>Sign in with</span>
+		<div>
+			<form method="get" action="{{ url_for('authentication.cac') }}">
+				<button type="submit"><img alt="CAC login" title="Sign in with CAC" src="{{ url_for('static', filename='authentication-codeshack/cac-logo.png') }}" loading="lazy" data-qa_selector="js_lazy_loaded_content">
+          			<span>CAC</span>
+				</button>
+			</form>
+		</div>
 	</div>
+	{% endif %}	
+
+	{% if not username_login_disable %}
+	<div class="sign-in-options">
+		<span class="no-image">Sign in with a registered account</span>
+		<div>
+			<form class="ajax-form" action="" method="post">
+
+				<label for="username">
+					<i class="fas fa-user"></i>
+				</label>
+				<input type="text" name="username" placeholder="Username" id="username" autocomplete="username" required>
+
+				<label for="password">
+					<i class="fas fa-lock"></i>
+				</label>
+				<input type="password" name="password" placeholder="Password" id="password" required>
+
+				<!-- <label id="rememberme">
+					<input type="checkbox" name="rememberme">Remember me
+				</label> -->
+				<a href="{{ url_for('authentication.forgotpassword') }}">Forgot Password?</a>
+
+				<input type="hidden" name="token" value="{{ token }}">
+
+
+				<input type="submit" value="Login">
+
+			</form>
+		</div>
+	</div>
+	{% endif %}
+
+	<div class="msg">{{ msg }}</div>
+
 </div>
-<script src="{{ url_for('static', filename='authentication-codeshack/script.js') }}"></script>
+{% if not username_login_disable %}
+	<script src="{{ url_for('static', filename='authentication-codeshack/script.js') }}"></script>
+{% endif %}
 {% endblock %}

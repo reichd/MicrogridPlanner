@@ -94,6 +94,10 @@ target/
 docker-compose.yaml
 */Dockerfile
 *.sbatch
+*.pem
+cac-server/certs/*.crt
+cac-server/certs/*.key
+cac-server/default.conf
 frontend/webapp/static/js/paths.js
 
 # Data

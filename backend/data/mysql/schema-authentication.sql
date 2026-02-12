@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS `user` (
   `username` varchar(32) NOT NULL,
   `password` varchar(255) NOT NULL,
   `email` varchar(64) NOT NULL,
+  `cacid` VARCHAR(128) UNIQUE DEFAULT NULL,
   `role` enum('Member','Admin','Guest') NOT NULL DEFAULT 'Member',
   `activation_code` varchar(255) NOT NULL DEFAULT '',
   `rememberme` varchar(255) NOT NULL DEFAULT '',
